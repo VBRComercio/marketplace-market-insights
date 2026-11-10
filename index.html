@@ -26,14 +26,14 @@
       </div>
     </aside>
     <main class="main" id="pesquisa">
-      <header class="topbar"><div class="breadcrumb">Pesquisa <span>/</span> <strong>Visão de mercado</strong></div><div class="top-actions"><div class="market-chip"><span class="flag">🇧🇷</span> Brasil <span class="chevron">⌄</span></div><a class="auth-link" href="/auth/login">Conectar Mercado Livre</a></div></header>
+      <header class="topbar"><div class="breadcrumb">Pesquisa <span>/</span> <strong>Visão de mercado</strong></div><div class="top-actions"><div class="market-chip"><span class="flag">🇧🇷</span> Brasil <span class="chevron">⌄</span></div><a class="auth-link" id="auth-link" href="/auth/login">Conectar Mercado Livre</a></div></header>
       <section class="intro">
         <div class="eyebrow"><span class="eyebrow-line"></span> INTELIGÊNCIA DE MERCADO</div>
         <h1>Encontre sua próxima<br><span>oportunidade.</span></h1>
         <p>Explore anúncios reais do Mercado Livre. Compare preços, entenda a concorrência e encontre espaço para se destacar.</p>
       </section>
       <section class="search-card" aria-label="Pesquisar produtos">
-        <div class="search-head"><div><span class="search-step">01</span><strong>O que você quer pesquisar?</strong></div><span class="api-badge"><i></i> API Mercado Livre</span></div>
+        <div class="search-head"><div><span class="search-step">01</span><strong>O que você quer pesquisar?</strong></div><span class="api-badge connection-checking" id="connection-badge" aria-live="polite"><i data-state="checking"></i><span>Verificando conexão…</span></span></div>
         <form id="search-form">
           <label class="sr-only" for="query">Produto ou palavra-chave</label>
           <div class="search-control"><span class="search-glass">⌕</span><input id="query" name="q" placeholder="Ex.: fone bluetooth, smartwatch..." maxlength="100" required><button id="search-button" type="submit">Pesquisar <span>→</span></button></div>
