@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101828">
+  <meta name="description" content="Pesquise anúncios do Mercado Livre e compare preços em uma visão rápida de mercado.">
+  <title>Radar de Mercado | Mercado Livre</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Radar de Mercado, início">
+        <span class="brand-mark">R</span><span>radar<span class="brand-light">.market</span></span>
+      </a>
+      <div class="side-label">PESQUISA</div>
+      <a class="side-link active" href="#pesquisa"><span class="nav-icon">⌕</span> Visão de mercado</a>
+      <div class="side-note"><span class="live-dot"></span> Dados do Mercado Livre</div>
+      <div class="sidebar-bottom">
+        <div class="avatar">VM</div><div><strong>Market Insights</strong><small>Projeto de portfólio</small></div>
+      </div>
+    </aside>
+    <main class="main" id="pesquisa">
+      <header class="topbar"><div class="breadcrumb">Pesquisa <span>/</span> <strong>Visão de mercado</strong></div><div class="market-chip"><span class="flag">🇧🇷</span> Brasil <span class="chevron">⌄</span></div></header>
+      <section class="intro">
+        <div class="eyebrow"><span class="eyebrow-line"></span> INTELIGÊNCIA DE MERCADO</div>
+        <h1>Encontre sua próxima<br><span>oportunidade.</span></h1>
+        <p>Explore anúncios reais do Mercado Livre. Compare preços, entenda a concorrência e encontre espaço para se destacar.</p>
+      </section>
+      <section class="search-card" aria-label="Pesquisar produtos">
+        <div class="search-head"><div><span class="search-step">01</span><strong>O que você quer pesquisar?</strong></div><span class="api-badge"><i></i> API Mercado Livre</span></div>
+        <form id="search-form">
+          <label class="sr-only" for="query">Produto ou palavra-chave</label>
+          <div class="search-control"><span class="search-glass">⌕</span><input id="query" name="q" placeholder="Ex.: fone bluetooth, smartwatch..." maxlength="100" required><button id="search-button" type="submit">Pesquisar <span>→</span></button></div>
+          <div class="search-hint">Experimente uma categoria, marca ou nome de produto</div>
+        </form>
+        <div class="quick-search"><span>BUSCAS POPULARES</span><button type="button" data-query="fone bluetooth">Fone bluetooth</button><button type="button" data-query="smartwatch">Smartwatch</button><button type="button" data-query="massageador cervical">Massageador cervical</button></div>
+      </section>
+      <div id="status" class="status" role="status" aria-live="polite">Digite um produto para começar a pesquisa.</div>
+      <section id="results" class="results" hidden>
+        <div class="results-title"><div><div class="eyebrow"><span class="eyebrow-line"></span> RESULTADO DA PESQUISA</div><h2 id="result-heading"></h2></div><div class="updated-label"><span class="live-dot"></span> Consulta ao vivo</div></div>
+        <div class="metrics">
+          <article class="metric-card"><div class="metric-top"><span>PREÇO MÉDIO</span><span class="metric-icon purple">↗</span></div><strong id="avg-price">—</strong><small>entre os anúncios encontrados</small></article>
+          <article class="metric-card"><div class="metric-top"><span>MENOR PREÇO</span><span class="metric-icon green">↓</span></div><strong id="min-price">—</strong><small id="min-title">menor oferta na busca</small></article>
+          <article class="metric-card"><div class="metric-top"><span>MAIOR PREÇO</span><span class="metric-icon orange">↑</span></div><strong id="max-price">—</strong><small id="max-title">maior oferta na busca</small></article>
+          <article class="metric-card"><div class="metric-top"><span>ANÚNCIOS</span><span class="metric-icon blue">▤</span></div><strong id="listing-count">—</strong><small>mostrados nesta consulta</small></article>
+        </div>
+        <div class="listing-panel">
+          <div class="panel-head"><div><h3>Anúncios encontrados</h3><p>Ofertas públicas relacionadas à sua busca</p></div><span class="sort-label">Ordenado por relevância <span>⌄</span></span></div>
+          <div class="table-wrap"><table><thead><tr><th>ANÚNCIO</th><th>PREÇO</th><th>CONDIÇÃO</th><th>VENDEDOR</th><th></th></tr></thead><tbody id="listing-rows"></tbody></table></div>
+          <div id="empty-results" class="empty" hidden>Nenhum anúncio encontrado para essa busca. Tente outro termo.</div>
+          <div class="panel-foot"><span id="result-count"></span><span>Preços podem mudar no Mercado Livre</span></div>
+        </div>
+        <p class="disclaimer">Análise indicativa baseada nos anúncios retornados pela API no momento da consulta. Preço, disponibilidade e resultados dependem da busca e não representam previsão de vendas, demanda ou margem.</p>
+      </section>
+      <footer>Feito para explorar oportunidades com dados públicos do <a href="https://www.mercadolivre.com.br/" target="_blank" rel="noreferrer">Mercado Livre ↗</a><span>MARKET INSIGHTS · 2026</span></footer>
+    </main>
+  </div>
+</body>
+</html>
