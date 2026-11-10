@@ -32,25 +32,34 @@ async function handleSearch({ request, env }) {
     refreshed = true;
   }
 
-  const upstream = new URL(`${API_BASE}/sites/MLB/search`);
+  const upstream = new URL(API_BASE + "/sites/MLB/search");
   upstream.searchParams.set("q", query);
   upstream.searchParams.set("limit", String(MAX_RESULTS));
   upstream.searchParams.set("sort", "relevance");
 
   try {
     const response = await fetch(upstream, {
-      headers: { Accept: "application/json", "User-Agent": "MarketplaceMarketInsights/1.0" }
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer " + session.access_token,
+        "User-Agent": "MarketplaceMarketInsights/1.0"
+      }
     });
+    const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
     if (response.status === 401) {
-      return json({ error: "A autorização foi revogada ou expirou. Conecte a conta novamente.", login_url: "/auth/login" }, 401, { "Set-Cookie": clearSessionCookie() });
+      return json({ error: "O Mercado Livre rejeitou a autorização. Atualize a conexão da conta e tente novamente.", login_url: "/auth/login" }, 401, { ...headers, "Set-Cookie": clearSessionCookie() });
     }
     if (!response.ok) {
-      const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
       if (response.status === 429) return json({ error: "O Mercado Livre limitou temporariamente as consultas. Aguarde um pouco e tente novamente." }, 429, headers);
       const apiError = await response.json().catch(() => null);
       const detail = describeApiError(apiError);
-      const suffix = detail ? ` Detalhe informado pela API: ${detail}` : "";
-      return json({ error: `A API do Mercado Livre respondeu com erro (${response.status}).${suffix}` }, 502, headers);
+      const suffix = detail ? " Detalhe informado pela API: " + detail : "";
+      return json({
+        error: "A API do Mercado Livre respondeu com erro (" + response.status + ")." + suffix,
+        upstream_status: response.status,
+        request_id: response.headers.get("x-request-id"),
+        api_date: response.headers.get("date")
+      }, 502, headers);
     }
 
     const raw = await response.json();
@@ -65,7 +74,6 @@ async function handleSearch({ request, env }) {
       seller: item.seller ? { id: item.seller.id } : null,
       category_id: item.category_id
     }));
-    const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
     return json({
       query,
       site: "MLB",
@@ -106,7 +114,7 @@ async function refreshSession(session, env) {
       client_secret: env.ML_CLIENT_SECRET,
       refresh_token: session.refresh_token
     });
-    const response = await fetch(`${API_BASE}/oauth/token`, {
+    const response = await fetch(API_BASE + "/oauth/token", {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
       body
