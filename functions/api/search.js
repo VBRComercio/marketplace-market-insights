@@ -39,7 +39,10 @@ export async function onRequestGet({ request, env }) {
     if (!response.ok) {
       const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
       if (response.status === 429) return json({ error: "O Mercado Livre limitou temporariamente as consultas. Aguarde um pouco e tente novamente." }, 429, headers);
-      return json({ error: `A API do Mercado Livre respondeu com erro (${response.status}). Tente novamente mais tarde.` }, 502, headers);
+      const apiError = await response.json().catch(() => null);
+      const detail = describeApiError(apiError);
+      const suffix = detail ? ` Detalhe informado pela API: ${detail}` : "";
+      return json({ error: `A API do Mercado Livre respondeu com erro (${response.status}).${suffix}` }, 502, headers);
     }
 
     const raw = await response.json();
@@ -65,6 +68,25 @@ export async function onRequestGet({ request, env }) {
     const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
     return json({ error: "Não foi possível conectar à API do Mercado Livre. Tente novamente." }, 502, headers);
   }
+}
+
+function describeApiError(payload) {
+  if (!payload || typeof payload !== "object") return "";
+  const parts = [];
+  for (const key of ["error", "code", "message"]) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) parts.push(value.trim());
+  }
+  if (Array.isArray(payload.cause)) {
+    for (const cause of payload.cause.slice(0, 2)) {
+      if (cause && typeof cause === "object") {
+        const code = typeof cause.code === "string" ? cause.code.trim() : "";
+        const message = typeof cause.message === "string" ? cause.message.trim() : "";
+        if (code || message) parts.push([code, message].filter(Boolean).join(": "));
+      }
+    }
+  }
+  return [...new Set(parts)].join(" — ").replace(/[\r\n\t]+/g, " ").slice(0, 240);
 }
 
 async function refreshSession(session, env) {
