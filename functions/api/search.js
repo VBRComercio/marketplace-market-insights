@@ -3,7 +3,15 @@ import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.
 const API_BASE = "https://api.mercadolibre.com";
 const MAX_RESULTS = 50;
 
-export async function onRequestGet({ request, env }) {
+export async function onRequestGet(context) {
+  try {
+    return await handleSearch(context);
+  } catch {
+    return json({ error: "Falha interna ao processar a busca. A função do Cloudflare retornou uma resposta inesperada; tente novamente após a implantação." }, 500);
+  }
+}
+
+async function handleSearch({ request, env }) {
   const url = new URL(request.url);
   const query = (url.searchParams.get("q") || "").trim();
   if (query.length < 2 || query.length > 100) {
