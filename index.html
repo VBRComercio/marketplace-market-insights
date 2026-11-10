@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
+  <script src="/account.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -20,6 +21,7 @@
       </a>
       <div class="side-label">PESQUISA</div>
       <a class="side-link active" href="#pesquisa"><span class="nav-icon">⌕</span> Visão de mercado</a>
+      <a class="side-link" href="#minha-conta"><span class="nav-icon">▤</span> Meus anúncios</a>
       <div class="side-note"><span class="side-indicator"></span> Dados do Mercado Livre</div>
       <div class="sidebar-bottom">
         <div class="avatar">VM</div><div><strong>Market Insights</strong><small>Projeto de portfólio</small></div>
@@ -42,6 +44,35 @@
         <div class="quick-search"><span>BUSCAS POPULARES</span><button type="button" data-query="fone bluetooth">Fone bluetooth</button><button type="button" data-query="smartwatch">Smartwatch</button><button type="button" data-query="massageador cervical">Massageador cervical</button></div>
       </section>
       <div id="status" class="status" role="status" aria-live="polite">Conecte sua conta do Mercado Livre para autorizar pesquisas reais.</div>
+      <section class="account-section" id="minha-conta" aria-labelledby="account-heading">
+        <div class="account-heading">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> DADOS DA SUA CONTA</div>
+            <h2 id="account-heading">Meus anúncios ativos</h2>
+            <p>Consulte seus próprios anúncios conectados ao Mercado Livre.</p>
+          </div>
+          <button type="button" class="account-load" id="load-items">Carregar anúncios <span>→</span></button>
+        </div>
+        <div id="account-status" class="account-status" role="status" aria-live="polite">Clique em “Carregar anúncios” para consultar sua conta.</div>
+        <div id="account-content" hidden>
+          <div class="account-summary">
+            <article><span>ANÚNCIOS ATIVOS</span><strong id="active-total">—</strong></article>
+            <article><span>ITENS NESTA PÁGINA</span><strong id="page-total">—</strong></article>
+            <article><span>ESTOQUE NESTA PÁGINA</span><strong id="stock-total">—</strong></article>
+          </div>
+          <div class="account-table-wrap">
+            <table class="account-table">
+              <thead><tr><th>ANÚNCIO</th><th>PREÇO</th><th>ESTOQUE</th><th>PUBLICAÇÃO</th><th></th></tr></thead>
+              <tbody id="account-rows"></tbody>
+            </table>
+          </div>
+          <div class="account-foot">
+            <span id="account-page-label"></span>
+            <div><button type="button" id="items-prev" disabled>← Anterior</button><button type="button" id="items-next" disabled>Próxima →</button></div>
+          </div>
+          <p id="scan-note" class="account-note" hidden>Esta conta tem mais de 1.000 anúncios ativos. A API exige paginação por varredura para carregar os demais; esta primeira versão mostra até os 1.000 iniciais.</p>
+        </div>
+      </section>
       <section id="results" class="results" hidden>
         <div class="results-title"><div><div class="eyebrow"><span class="eyebrow-line"></span> RESULTADO DA PESQUISA</div><h2 id="result-heading"></h2></div><div class="updated-label"><span class="live-dot"></span> Consulta ao vivo</div></div>
         <div class="metrics">
