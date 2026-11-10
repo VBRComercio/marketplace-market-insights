@@ -39,7 +39,7 @@ async function handleSearch({ request, env }) {
 
   try {
     const response = await fetch(upstream, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${session.access_token}`, "User-Agent": "MarketplaceMarketInsights/1.0" }
+      headers: { Accept: "application/json", "User-Agent": "MarketplaceMarketInsights/1.0" }
     });
     if (response.status === 401) {
       return json({ error: "A autorização foi revogada ou expirou. Conecte a conta novamente.", login_url: "/auth/login" }, 401, { "Set-Cookie": clearSessionCookie() });
