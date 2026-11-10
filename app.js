@@ -6,7 +6,23 @@ const resultsEl = document.querySelector("#results");
 const rowsEl = document.querySelector("#listing-rows");
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
-const showError = (message) => { statusEl.textContent = message; statusEl.className = "status error"; };
+const showError = (message, loginUrl) => {
+  statusEl.textContent = message;
+  statusEl.className = "status error";
+  if (loginUrl) {
+    const link = document.createElement("a");
+    link.href = loginUrl;
+    link.textContent = "Conectar ao Mercado Livre";
+    link.className = "inline-auth-link";
+    statusEl.append(" ", link);
+  }
+};
+const pageUrl = new URL(window.location.href);
+if (pageUrl.searchParams.get("oauth") === "connected") {
+  statusEl.textContent = "Conta conectada. Agora você já pode pesquisar.";
+  pageUrl.searchParams.delete("oauth");
+  window.history.replaceState({}, "", pageUrl.pathname + pageUrl.search + pageUrl.hash);
+}
 
 async function search(query) {
   button.disabled = true;
@@ -17,7 +33,7 @@ async function search(query) {
   try {
     const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { headers: { Accept: "application/json" } });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Não foi possível consultar a API agora.");
+    if (!response.ok) { showError(data.error || "Não foi possível consultar a API agora.", data.login_url); return; }
     renderResults(query, data);
     statusEl.textContent = "";
   } catch (error) {
