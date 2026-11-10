@@ -9,17 +9,19 @@ export async function onRequestGet({ request, env }) {
   const clearCookies = clearOAuthCookies();
 
   if (url.searchParams.has("error")) {
-    return htmlResponse("Autorização não concluída", "O Mercado Livre não autorizou o acesso. Volte ao site e tente novamente.", 400WithNo);
+    const response = htmlResponse("Autorização não concluída", "O Mercado Livre não autorizou o acesso. Volte ao site e tente novamente.", 400);
+    for (const cookie of clearCookies) response.headers.append("Set-Cookie", cookie);
+    return response;
   }
   if (!code || !returnedState || !savedState || returnedState !== savedState || !verifier) {
-    return new Response("Retorno OAuth inválido ou expirado. Inicie novamente pelo botão Conectar Mercado Livre.", {
-      status: 400, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }
-    });
+    const response = htmlResponse("Retorno OAuth inválido", "O retorno expirou ou não corresponde ao início do login. Volte ao site e clique novamente em Conectar Mercado Livre.", 400);
+    for (const cookie of clearCookies) response.headers.append("Set-Cookie", cookie);
+    return response;
   }
   if (!env.ML_CLIENT_ID || !env.ML_CLIENT_SECRET) {
-    return new Response("Configure ML_CLIENT_ID e ML_CLIENT_SECRET em Cloudflare Pages > Settings > Variables and Secrets.", {
-      status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }
-    });
+    const response = htmlResponse("Credenciais não configuradas", "No Cloudflare Pages, configure ML_CLIENT_ID e ML_CLIENT_SECRET em Settings > Variables and Secrets.", 503);
+    for (const cookie of clearCookies) response.headers.append("Set-Cookie", cookie);
+    return response;
   }
 
   try {
@@ -38,7 +40,9 @@ export async function onRequestGet({ request, env }) {
     });
     const tokens = await tokenResponse.json();
     if (!tokenResponse.ok || !tokens.access_token || !tokens.refresh_token) {
-      return htmlResponse("Não foi possível conectar", "O Mercado Livre recusou a troca do código por tokens. Confira o Client ID, o Client Secret e se a URI de redirecionamento cadastrada corresponde exatamente à do site.", 502);
+      const response = htmlResponse("Não foi possível conectar", "O Mercado Livre recusou a troca do código por tokens. Confira o Client ID, o Client Secret e se a URI de redirecionamento cadastrada corresponde exatamente à do site.", 502);
+      for (const cookie of clearCookies) response.headers.append("Set-Cookie", cookie);
+      return response;
     }
 
     const cookie = await sessionCookie({
@@ -46,9 +50,10 @@ export async function onRequestGet({ request, env }) {
       refresh_token: tokens.refresh_token,
       expires_at: Date.now() + Number(tokens.expires_in || 21600) * 1000
     }, env);
-    const response = redirectResponse("/?oauth=connected", [...clearCookies, cookie]);
-    return response;
+    return redirectResponse("/?oauth=connected", [...clearCookies, cookie]);
   } catch {
-    return htmlResponse("Erro ao conectar", "Não foi possível concluir a autorização agora. Tente novamente.", 502);
+    const response = htmlResponse("Erro ao conectar", "Não foi possível concluir a autorização agora. Tente novamente.", 502);
+    for (const cookie of clearCookies) response.headers.append("Set-Cookie", cookie);
+    return response;
   }
 }
