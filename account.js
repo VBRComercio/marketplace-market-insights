@@ -42,7 +42,6 @@ function listingTypeLabel(type) {
 async function loadAccountItems(offset = 0) {
   if (loadingItems) return;
   loadingItems = true;
-  currentOffset = offset;
   loadItemsButton.disabled = true;
   previousButton.disabled = true;
   nextButton.disabled = true;
@@ -78,6 +77,7 @@ async function loadAccountItems(offset = 0) {
 function renderAccountItems(data) {
   const items = Array.isArray(data.items) ? data.items : [];
   accountPaging = data.paging || { total: items.length, limit: 50, offset: currentOffset, has_more: false };
+  currentOffset = Number(accountPaging.offset) || 0;
   const total = Number(accountPaging.total || 0);
   const stock = items.reduce((sum, item) => sum + Math.max(0, Number(item.available_quantity) || 0), 0);
 
@@ -95,7 +95,8 @@ function renderAccountItems(data) {
       : '<span class="account-image-placeholder">◇</span>';
     const quantity = item.available_quantity === null ? "—" : new Intl.NumberFormat("pt-BR").format(item.available_quantity);
     const stockClass = Number(item.available_quantity) === 0 ? "stock-empty" : "";
-    const price = Number.isFinite(Number(item.price)) ? accountMoney.format(Number(item.price)) : "—";
+    const hasPrice = item.price !== null && item.price !== undefined && item.price !== "";
+    const price = hasPrice && Number.isFinite(Number(item.price)) ? accountMoney.format(Number(item.price)) : "—";
     const link = item.permalink ? accountEsc(item.permalink) : "#";
     return '<tr><td><div class="account-item">' + picture + '<div><strong>' + accountEsc(item.title) + '</strong><small>' + accountEsc(item.id) + '</small></div></div></td>' +
       '<td class="account-price">' + price + '</td><td><span class="stock-value ' + stockClass + '">' + quantity + '</span></td>' +
@@ -112,4 +113,7 @@ loadItemsButton.addEventListener("click", () => loadAccountItems(0));
 previousButton.addEventListener("click", () => loadAccountItems(Math.max(0, currentOffset - 50)));
 nextButton.addEventListener("click", () => loadAccountItems(currentOffset + 50));
 
-document.querySelectorAll('.side-link[href="#"]').forEach((link) => link.addEventListener("click", (event) => event.preventDefault()));
+document.querySelectorAll(".side-link").forEach((link) => link.addEventListener("click", () => {
+  document.querySelectorAll(".side-link").forEach((candidate) => candidate.classList.remove("active"));
+  link.classList.add("active");
+}));
