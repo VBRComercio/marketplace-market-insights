@@ -32,6 +32,14 @@ async function search(query) {
   resultsEl.hidden = true;
   try {
     const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { headers: { Accept: "application/json" } });
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      const body = await response.text();
+      const title = body.match(/<title[^>]*>([^<]{1,120})<\/title>/i)?.[1]?.trim();
+      const detail = title ? ` — ${title}` : "";
+      showError(`O servidor respondeu com uma página HTML em vez de JSON (HTTP ${response.status}${detail}). A função de busca pode estar com erro na implantação.`);
+      return;
+    }
     const data = await response.json();
     if (!response.ok) { showError(data.error || "Não foi possível consultar a API agora.", data.login_url); return; }
     renderResults(query, data);
