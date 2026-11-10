@@ -1,40 +1,41 @@
 # Marketplace Market Insights
 
-Painel de pesquisa e análise de mercado para o Mercado Livre. Pesquisa anúncios reais do site brasileiro (MLB), compara preços e apresenta ofertas públicas relacionadas à busca.
+Painel de pesquisa e análise de mercado para o Mercado Livre. Pesquisa anúncios do site brasileiro (MLB), compara preços e apresenta ofertas relacionadas à busca, com OAuth para autorizar chamadas à API.
 
 ## Funcionalidades
 
 - Busca por palavra-chave na API do Mercado Livre.
 - Indicadores de preço médio, menor preço, maior preço e quantidade de anúncios retornados.
-- Lista com título, preço, condição, vendedor e link para cada anúncio.
-- Interface responsiva em português.
-- Cloudflare Pages Function como intermediária da API.
+- Lista de anúncios com título, preço, condição, vendedor e link.
+- OAuth Authorization Code com PKCE, validação de `state` e renovação automática de tokens.
+- Sessão em cookie `HttpOnly`, `Secure` e criptografada no servidor.
+- Interface responsiva e Cloudflare Pages Functions.
 
-> Os indicadores descrevem os anúncios retornados no momento da consulta. Não representam previsão de demanda, vendas ou margem. A API pode limitar ou alterar os dados retornados.
+> Os indicadores descrevem os anúncios retornados no momento da consulta. Não representam previsão de demanda, vendas ou margem.
 
-## Tecnologias
+## Callback OAuth
 
-HTML, CSS e JavaScript sem framework; Cloudflare Pages Functions; API do Mercado Livre.
+Cadastre esta Redirect URI no aplicativo Mercado Livre, exatamente como aparece:
 
-## Rodar localmente
-
-Requer Node.js e Wrangler:
-
-```bash
-npm install --global wrangler
-wrangler pages dev .
+```
+https://marketplace-market-insights.pages.dev/oauth/callback
 ```
 
-Abra o endereço local informado pelo Wrangler. A função `functions/api/search.js` atende `/api/search?q=termo`.
+## Configurar credenciais no Cloudflare
 
-## Publicar no Cloudflare Pages
+No projeto Pages, abra **Settings → Variables and Secrets** e adicione no ambiente **Production**:
 
-1. Conecte este repositório ao Cloudflare Pages.
-2. Configure a pasta de saída como `/`; não é necessário comando de build.
-3. Faça o primeiro deploy e acesse a URL `*.pages.dev` gerada.
+- `ML_CLIENT_ID`: App ID do aplicativo Mercado Livre.
+- `ML_CLIENT_SECRET`: Secret Key do aplicativo, como secret criptografado.
 
-A pesquisa de anúncios públicos deste MVP não precisa do Client Secret OAuth. Se uma etapa futura usar dados privados da conta ou endpoints que exijam autorização, configure OAuth e os segredos somente no servidor, nunca no JavaScript do navegador.
+Não envie o Client Secret pelo chat nem o grave no GitHub. Após salvar as variáveis, faça um novo deploy.
 
-## Segurança e dados
+## Publicação e desenvolvimento
 
-Não coloque Client Secret, access token ou refresh token no repositório. A aplicação consulta resultados públicos de busca e não altera anúncios nem dados da conta.
+O site está na raiz do repositório e as funções em `functions/`. Para Pages, use ramo `main`, comando de build `exit 0`, diretório de saída `.` e mantenha o diretório raiz vazio.
+
+Para desenvolvimento local, instale Wrangler e execute `wrangler pages dev .`. A rota `/auth/login` inicia a autorização, `/oauth/callback` recebe o retorno e `/api/search?q=termo` pesquisa anúncios.
+
+## Segurança
+
+As chamadas à API são feitas no servidor com o access token. Access token e refresh token ficam em cookie criptografado `HttpOnly`, inacessível ao JavaScript do navegador. O Client Secret não deve ser publicado. O projeto não altera anúncios nem dados da conta.
