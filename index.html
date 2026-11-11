@@ -49,7 +49,7 @@
           <div>
             <div class="eyebrow"><span class="eyebrow-line"></span> DADOS DA SUA CONTA</div>
             <h2 id="account-heading">Meus anúncios ativos</h2>
-            <p>Consulte seus próprios anúncios conectados ao Mercado Livre.</p>
+            <p>O preço principal é o vigente no Marketplace; quando houver promoção, o preço regular aparece riscado.</p>
           </div>
           <button type="button" class="account-load" id="load-items">Carregar anúncios <span>→</span></button>
         </div>
@@ -62,7 +62,7 @@
           </div>
           <div class="account-table-wrap">
             <table class="account-table">
-              <thead><tr><th>ANÚNCIO</th><th>PREÇO</th><th>ESTOQUE</th><th>PUBLICAÇÃO</th><th></th></tr></thead>
+              <thead><tr><th>ANÚNCIO</th><th>PREÇO DE VENDA</th><th>ESTOQUE</th><th>PUBLICAÇÃO</th><th></th></tr></thead>
               <tbody id="account-rows"></tbody>
             </table>
           </div>
@@ -76,18 +76,18 @@
       <section id="results" class="results" hidden>
         <div class="results-title"><div><div class="eyebrow"><span class="eyebrow-line"></span> RESULTADO DA PESQUISA</div><h2 id="result-heading"></h2></div><div class="updated-label"><span class="live-dot"></span> Consulta ao vivo</div></div>
         <div class="metrics">
-          <article class="metric-card"><div class="metric-top"><span>PREÇO MÉDIO</span><span class="metric-icon purple">↗</span></div><strong id="avg-price">—</strong><small>entre os anúncios encontrados</small></article>
+          <article class="metric-card"><div class="metric-top"><span>PREÇO MÉDIO DE VENDA</span><span class="metric-icon purple">↗</span></div><strong id="avg-price">—</strong><small>valores vigentes no Marketplace</small></article>
           <article class="metric-card"><div class="metric-top"><span>MENOR PREÇO</span><span class="metric-icon green">↓</span></div><strong id="min-price">—</strong><small id="min-title">menor oferta na busca</small></article>
           <article class="metric-card"><div class="metric-top"><span>MAIOR PREÇO</span><span class="metric-icon orange">↑</span></div><strong id="max-price">—</strong><small id="max-title">maior oferta na busca</small></article>
           <article class="metric-card"><div class="metric-top"><span>ANÚNCIOS</span><span class="metric-icon blue">▤</span></div><strong id="listing-count">—</strong><small>mostrados nesta consulta</small></article>
         </div>
         <div class="listing-panel">
           <div class="panel-head"><div><h3>Anúncios encontrados</h3><p>Ofertas públicas relacionadas à sua busca</p></div><span class="sort-label">Ordenado por relevância <span>⌄</span></span></div>
-          <div class="table-wrap"><table><thead><tr><th>ANÚNCIO</th><th>PREÇO</th><th>CONDIÇÃO</th><th>VENDEDOR</th><th></th></tr></thead><tbody id="listing-rows"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>ANÚNCIO</th><th>PREÇO DE VENDA</th><th>CONDIÇÃO</th><th>VENDEDOR</th><th></th></tr></thead><tbody id="listing-rows"></tbody></table></div>
           <div id="empty-results" class="empty" hidden>Nenhum anúncio encontrado para essa busca. Tente outro termo.</div>
           <div class="panel-foot"><span id="result-count"></span><span>Preços podem mudar no Mercado Livre</span></div>
         </div>
-        <p class="disclaimer">Análise indicativa baseada nos anúncios retornados pela API no momento da consulta. Preço, disponibilidade e resultados dependem da busca e não representam previsão de vendas, demanda ou margem.</p>
+        <p class="disclaimer">Preço principal consultado pelo endpoint de preço de venda para o canal Marketplace; o preço regular aparece riscado quando há promoção. Análise indicativa: disponibilidade e valores podem mudar e não representam previsão de vendas, demanda ou margem.</p>
       </section>
       <footer>Feito para explorar oportunidades com dados públicos do <a href="https://www.mercadolivre.com.br/" target="_blank" rel="noreferrer">Mercado Livre ↗</a><span>MARKET INSIGHTS · 2026</span></footer>
     </main>
