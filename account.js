@@ -352,9 +352,11 @@ function populateCostFields(mappings = new Map()) {
   if (latest) {
     document.querySelector("#cost-unit").value = latest.unit_cost;
     document.querySelector("#cost-packaging").value = latest.packaging_cost;
-    document.querySelector("#cost-effective-from").value = todayInBrazil();
     document.querySelector("#cost-lot").value = "";
-    document.querySelector("#cost-lot-quantity").value = "";
+  } else {
+    document.querySelector("#cost-unit").value = "";
+    document.querySelector("#cost-packaging").value = "0.50";
+    document.querySelector("#cost-lot").value = "";
   }
 }
 
@@ -367,7 +369,7 @@ function renderAnalysisHistory() {
     ? '<ul>' + rates.map((entry) => '<li>' + accountEsc(entry.effective_from) + ': NF ' + accountEsc(entry.nf_percent) + '%, Ads ' + accountEsc(entry.ads_percent) + '%, defeitos ' + accountEsc(entry.defect_percent) + '%, operação ' + accountEsc(entry.operational_percent) + '%, alerta de estoque ' + accountEsc(entry.stock_alert_days) + ' dias</li>').join("") + '</ul>'
     : '<p>Nenhuma versão de parâmetros salva.</p>';
   const costsMarkup = costs.length
-    ? '<ul>' + costs.map((entry) => '<li>SKU ' + accountEsc(entry.sku) + (entry.lot_code ? ' · lote ' + accountEsc(entry.lot_code) : "") + ' · desde ' + accountEsc(entry.effective_from) + ' · produto ' + accountMoney.format(Number(entry.unit_cost)) + ' · embalagem ' + accountMoney.format(Number(entry.packaging_cost)) + + '</li>').join("") + '</ul>'
+    ? '<ul>' + costs.map((entry) => '<li>SKU ' + accountEsc(entry.sku) + (entry.lot_code ? ' · lote ' + accountEsc(entry.lot_code) : "") + ' · desde ' + accountEsc(entry.effective_from) + ' · produto ' + accountMoney.format(Number(entry.unit_cost)) + ' · embalagem ' + accountMoney.format(Number(entry.packaging_cost)) + '</li>').join("") + '</ul>'
     : '<p>Nenhum custo por SKU/lote salvo.</p>';
   target.innerHTML = '<h5>Parâmetros gerais do CNPJ</h5>' + ratesMarkup + '<h5>Custos por SKU e lote</h5>' + costsMarkup;
 }
@@ -417,7 +419,7 @@ costForm?.addEventListener("submit", (event) => {
     lot_code: document.querySelector("#cost-lot").value,
     effective_from: document.querySelector("#cost-effective-from").value,
     unit_cost: document.querySelector("#cost-unit").value,
-    packaging_cost: document.querySelector("#cost-packaging").value,
+    packaging_cost: document.querySelector("#cost-packaging").value
   }, "Custo do SKU/lote salvo.");
 });
 
@@ -482,6 +484,15 @@ function renderMarginTable() {
   });
   marginRows.innerHTML = rows.join("");
 
+  if (!marginByItem.size) {
+    analysisTotalPayout.textContent = "—";
+    analysisTotalMargin.textContent = "—";
+    analysisStockValue.textContent = "—";
+    const lowStockElement = document.querySelector("#analysis-low-stock-count");
+    if (lowStockElement) lowStockElement.textContent = "—";
+    analysisSummary.hidden = true;
+    return;
+  }
   const completePayout = accountItems.length > 0 && accountItems.every((item) => marginByItem.get(item.id)?.contribution_margin !== null && marginByItem.get(item.id)?.contribution_margin !== undefined);
   const completeMargin = accountItems.length > 0 && accountItems.every((item) => marginByItem.get(item.id)?.estimated_margin !== null && marginByItem.get(item.id)?.estimated_margin !== undefined);
   const knownStock = accountItems.reduce((sum, item) => {
@@ -494,10 +505,10 @@ function renderMarginTable() {
   analysisStockValue.textContent = marginByItem.size ? formatValue(knownStock) + (completeStock ? "" : " · parcial") : "—";
   const lowStockCount = accountItems.filter((item) => {
     const metrics = performanceByItem.get(item.id);
-    const qty = Number(item.available_quantity);
+    const qty = item.available_quantity === null || item.available_quantity === undefined ? null : Number(item.available_quantity);
     const soldUnits = metrics?.units_sold;
     const daily = soldUnits === null || soldUnits === undefined ? null : Number(soldUnits) / (Number(performanceDays?.value) || 30);
-    return daily > 0 && Number.isFinite(qty) && qty / daily <= Number(analysisConfig?.rates?.stock_alert_days ?? 7);
+    return daily > 0 && qty !== null && Number.isFinite(qty) && qty / daily <= Number(analysisConfig?.rates?.stock_alert_days ?? 7);
   }).length;
   const lowStockElement = document.querySelector("#analysis-low-stock-count");
   if (lowStockElement) lowStockElement.textContent = performanceByItem.size ? String(lowStockCount) : "Consulte desempenho";
