@@ -19,16 +19,19 @@
       <a class="brand" href="/" aria-label="Radar de Mercado, início">
         <span class="brand-mark">R</span><span>radar<span class="brand-light">.market</span></span>
       </a>
-      <div class="side-label">PESQUISA</div>
-      <a class="side-link active" href="#pesquisa"><span class="nav-icon">⌕</span> Visão de mercado</a>
-      <a class="side-link" href="#minha-conta"><span class="nav-icon">▤</span> Meus anúncios</a>
+      <div class="side-label">ANÁLISE</div>
+      <a class="side-link active" href="#visao-mercado" data-page="market"><span class="nav-icon">⌕</span> Visão de mercado</a>
+      <a class="side-link" href="#meus-anuncios" data-page="items"><span class="nav-icon">▤</span> Meus anúncios</a>
+      <a class="side-link" href="#desempenho" data-page="performance"><span class="nav-icon">↗</span> Vendas e visitas</a>
+      <a class="side-link" href="#margem-estoque" data-page="analysis"><span class="nav-icon">◫</span> Margem e estoque</a>
       <div class="side-note"><span class="side-indicator"></span> Dados do Mercado Livre</div>
       <div class="sidebar-bottom">
         <div class="avatar">VM</div><div><strong>Market Insights</strong><small>Projeto de portfólio</small></div>
       </div>
     </aside>
-    <main class="main" id="pesquisa">
+    <main class="main" id="app-main">
       <header class="topbar"><div class="breadcrumb">Pesquisa <span>/</span> <strong>Visão de mercado</strong></div><div class="top-actions"><div class="market-chip"><span class="flag">🇧🇷</span> Brasil <span class="chevron">⌄</span></div><a class="auth-link" id="auth-link" href="/auth/login">Conectar Mercado Livre</a></div></header>
+      <section class="page-view active" id="page-market" data-page-view="market" aria-label="Visão de mercado">
       <section class="intro">
         <div class="eyebrow"><span class="eyebrow-line"></span> INTELIGÊNCIA DE MERCADO</div>
         <h1>Encontre sua próxima<br><span>oportunidade.</span></h1>
@@ -44,6 +47,24 @@
         <div class="quick-search"><span>BUSCAS POPULARES</span><button type="button" data-query="fone bluetooth">Fone bluetooth</button><button type="button" data-query="smartwatch">Smartwatch</button><button type="button" data-query="massageador cervical">Massageador cervical</button></div>
       </section>
       <div id="status" class="status" role="status" aria-live="polite">Conecte sua conta do Mercado Livre para autorizar pesquisas reais.</div>
+      <section id="results" class="results" hidden>
+        <div class="results-title"><div><div class="eyebrow"><span class="eyebrow-line"></span> RESULTADO DA PESQUISA</div><h2 id="result-heading"></h2></div><div class="updated-label"><span class="live-dot"></span> Consulta ao vivo</div></div>
+        <div class="metrics">
+          <article class="metric-card"><div class="metric-top"><span>PREÇO MÉDIO DE VENDA</span><span class="metric-icon purple">↗</span></div><strong id="avg-price">—</strong><small>valores vigentes no Marketplace</small></article>
+          <article class="metric-card"><div class="metric-top"><span>MENOR PREÇO</span><span class="metric-icon green">↓</span></div><strong id="min-price">—</strong><small id="min-title">menor oferta na busca</small></article>
+          <article class="metric-card"><div class="metric-top"><span>MAIOR PREÇO</span><span class="metric-icon orange">↑</span></div><strong id="max-price">—</strong><small id="max-title">maior oferta na busca</small></article>
+          <article class="metric-card"><div class="metric-top"><span>ANÚNCIOS</span><span class="metric-icon blue">▤</span></div><strong id="listing-count">—</strong><small>mostrados nesta consulta</small></article>
+        </div>
+        <div class="listing-panel">
+          <div class="panel-head"><div><h3>Anúncios encontrados</h3><p>Ofertas públicas relacionadas à sua busca</p></div><span class="sort-label">Ordenado por relevância <span>⌄</span></span></div>
+          <div class="table-wrap"><table><thead><tr><th>ANÚNCIO</th><th>PREÇO DE VENDA</th><th>CONDIÇÃO</th><th>VENDEDOR</th><th></th></tr></thead><tbody id="listing-rows"></tbody></table></div>
+          <div id="empty-results" class="empty" hidden>Nenhum anúncio encontrado para essa busca. Tente outro termo.</div>
+          <div class="panel-foot"><span id="result-count"></span><span>Preços podem mudar no Mercado Livre</span></div>
+        </div>
+        <p class="disclaimer">Preço principal consultado pelo endpoint de preço de venda para o canal Marketplace; o preço regular aparece riscado quando há promoção. Análise indicativa: disponibilidade e valores podem mudar e não representam previsão de vendas, demanda ou margem.</p>
+      </section>
+      </section>
+      <section class="page-view" id="page-items" data-page-view="items">
       <section class="account-section" id="minha-conta" aria-labelledby="account-heading">
         <div class="account-heading">
           <div>
@@ -60,6 +81,22 @@
             <article><span>ITENS NESTA PÁGINA</span><strong id="page-total">—</strong></article>
             <article><span>ESTOQUE NESTA PÁGINA</span><strong id="stock-total">—</strong></article>
           </div>
+          <div class="account-list-tools"><label for="account-sort">Ordenar anúncios</label><select id="account-sort"><option value="title">Nome: A–Z</option><option value="price-asc">Preço de venda: menor primeiro</option><option value="price-desc">Preço de venda: maior primeiro</option><option value="stock-desc">Estoque: maior primeiro</option><option value="stock-asc">Estoque: menor primeiro</option></select><span>Ordena os anúncios desta página.</span></div>
+          <div class="account-table-wrap">
+            <table class="account-table">
+              <thead><tr><th>ANÚNCIO</th><th>PREÇO DE VENDA</th><th>ESTOQUE</th><th>PUBLICAÇÃO</th><th>VISITAS</th><th>UNIDADES VENDIDAS</th><th>FATURAMENTO BRUTO</th><th></th></tr></thead>
+              <tbody id="account-rows"></tbody>
+            </table>
+          </div>
+          <div class="account-foot">
+            <span id="account-page-label"></span>
+            <div><button type="button" id="items-prev" disabled>← Anterior</button><button type="button" id="items-next" disabled>Próxima →</button></div>
+          </div>
+          <p id="scan-note" class="account-note" hidden>Esta conta tem mais de 1.000 anúncios ativos. A API exige paginação por varredura para carregar os demais; esta primeira versão mostra até os 1.000 iniciais.</p>
+        </div>
+      </section>
+      <section class="page-view" id="page-performance" data-page-view="performance" aria-labelledby="performance-page-heading">
+        <div class="page-heading"><div class="eyebrow"><span class="eyebrow-line"></span> DADOS DA SUA CONTA</div><h1 id="performance-page-heading">Vendas e visitas</h1><p>Acompanhe visitas, pedidos pagos e faturamento por anúncio. Selecione 7, 30 ou 90 dias.</p></div>
           <div class="performance-panel">
             <div class="performance-heading">
               <div><h3 id="performance-heading">Vendas e visitas</h3><p>Métricas por anúncio no período escolhido.</p></div>
@@ -76,6 +113,16 @@
               <article><span>FATURAMENTO BRUTO</span><strong id="period-gross">—</strong></article>
             </div>
           </div>
+
+        <div class="account-table-wrap">
+          <table class="account-table performance-table">
+            <thead><tr><th>ANÚNCIO</th><th>VISITAS</th><th>UNIDADES VENDIDAS</th><th>FATURAMENTO BRUTO</th><th></th></tr></thead>
+            <tbody id="performance-rows"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="page-view" id="page-analysis" data-page-view="analysis" aria-labelledby="analysis-page-heading">
+        <div class="page-heading"><div class="eyebrow"><span class="eyebrow-line"></span> RENTABILIDADE E ESTOQUE</div><h1 id="analysis-page-heading">Margem e estoque</h1><p>Repasse previsto, margem estimada e indicadores analíticos de estoque da conta.</p></div>
           <section class="analysis-panel" aria-labelledby="analysis-heading">
             <div class="analysis-heading">
               <div><div class="eyebrow"><span class="eyebrow-line"></span> RENTABILIDADE E ESTOQUE</div><h3 id="analysis-heading">Margem e estoque</h3><p>A margem de contribuição representa o repasse previsto. A margem estimada desconta os custos cadastrados; a cobertura usa o período selecionado.</p></div>
@@ -124,35 +171,6 @@
             </div>
             <details class="analysis-history"><summary>Histórico de percentuais e custos</summary><div id="analysis-history"></div></details>
           </section>
-          <div class="account-list-tools"><label for="account-sort">Ordenar anúncios</label><select id="account-sort"><option value="title">Nome: A–Z</option><option value="price-asc">Preço de venda: menor primeiro</option><option value="price-desc">Preço de venda: maior primeiro</option><option value="stock-desc">Estoque: maior primeiro</option><option value="stock-asc">Estoque: menor primeiro</option></select><span>Ordena os anúncios desta página.</span></div>
-          <div class="account-table-wrap">
-            <table class="account-table">
-              <thead><tr><th>ANÚNCIO</th><th>PREÇO DE VENDA</th><th>ESTOQUE</th><th>PUBLICAÇÃO</th><th>VISITAS</th><th>UNIDADES VENDIDAS</th><th>FATURAMENTO BRUTO</th><th></th></tr></thead>
-              <tbody id="account-rows"></tbody>
-            </table>
-          </div>
-          <div class="account-foot">
-            <span id="account-page-label"></span>
-            <div><button type="button" id="items-prev" disabled>← Anterior</button><button type="button" id="items-next" disabled>Próxima →</button></div>
-          </div>
-          <p id="scan-note" class="account-note" hidden>Esta conta tem mais de 1.000 anúncios ativos. A API exige paginação por varredura para carregar os demais; esta primeira versão mostra até os 1.000 iniciais.</p>
-        </div>
-      </section>
-      <section id="results" class="results" hidden>
-        <div class="results-title"><div><div class="eyebrow"><span class="eyebrow-line"></span> RESULTADO DA PESQUISA</div><h2 id="result-heading"></h2></div><div class="updated-label"><span class="live-dot"></span> Consulta ao vivo</div></div>
-        <div class="metrics">
-          <article class="metric-card"><div class="metric-top"><span>PREÇO MÉDIO DE VENDA</span><span class="metric-icon purple">↗</span></div><strong id="avg-price">—</strong><small>valores vigentes no Marketplace</small></article>
-          <article class="metric-card"><div class="metric-top"><span>MENOR PREÇO</span><span class="metric-icon green">↓</span></div><strong id="min-price">—</strong><small id="min-title">menor oferta na busca</small></article>
-          <article class="metric-card"><div class="metric-top"><span>MAIOR PREÇO</span><span class="metric-icon orange">↑</span></div><strong id="max-price">—</strong><small id="max-title">maior oferta na busca</small></article>
-          <article class="metric-card"><div class="metric-top"><span>ANÚNCIOS</span><span class="metric-icon blue">▤</span></div><strong id="listing-count">—</strong><small>mostrados nesta consulta</small></article>
-        </div>
-        <div class="listing-panel">
-          <div class="panel-head"><div><h3>Anúncios encontrados</h3><p>Ofertas públicas relacionadas à sua busca</p></div><span class="sort-label">Ordenado por relevância <span>⌄</span></span></div>
-          <div class="table-wrap"><table><thead><tr><th>ANÚNCIO</th><th>PREÇO DE VENDA</th><th>CONDIÇÃO</th><th>VENDEDOR</th><th></th></tr></thead><tbody id="listing-rows"></tbody></table></div>
-          <div id="empty-results" class="empty" hidden>Nenhum anúncio encontrado para essa busca. Tente outro termo.</div>
-          <div class="panel-foot"><span id="result-count"></span><span>Preços podem mudar no Mercado Livre</span></div>
-        </div>
-        <p class="disclaimer">Preço principal consultado pelo endpoint de preço de venda para o canal Marketplace; o preço regular aparece riscado quando há promoção. Análise indicativa: disponibilidade e valores podem mudar e não representam previsão de vendas, demanda ou margem.</p>
       </section>
       <footer>Feito para explorar oportunidades com dados públicos do <a href="https://www.mercadolivre.com.br/" target="_blank" rel="noreferrer">Mercado Livre ↗</a><span>MARKET INSIGHTS · 2026</span></footer>
     </main>
