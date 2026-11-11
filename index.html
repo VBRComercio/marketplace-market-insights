@@ -76,6 +76,54 @@
               <article><span>FATURAMENTO BRUTO</span><strong id="period-gross">—</strong></article>
             </div>
           </div>
+          <section class="analysis-panel" aria-labelledby="analysis-heading">
+            <div class="analysis-heading">
+              <div><div class="eyebrow"><span class="eyebrow-line"></span> RENTABILIDADE E ESTOQUE</div><h3 id="analysis-heading">Margem e estoque</h3><p>Repasse previsto do Mercado Livre, margens e cobertura do estoque. Consulta somente leitura.</p></div>
+              <button type="button" id="load-margin-analysis">Atualizar análise</button>
+            </div>
+            <div id="analysis-status" class="account-status" role="status" aria-live="polite">Carregue os anúncios para consultar margens e estoque.</div>
+            <div id="analysis-summary" class="account-summary analysis-summary" hidden>
+              <article><span>REPASSE PREVISTO NA PÁGINA</span><strong id="analysis-total-payout">—</strong></article>
+              <article><span>MARGEM ESTIMADA NA PÁGINA</span><strong id="analysis-total-margin">—</strong></article>
+              <article><span>VALOR ESTIMADO EM ESTOQUE</span><strong id="analysis-stock-value">—</strong></article>
+            </div>
+            <div class="analysis-config-grid">
+              <section class="analysis-config-card">
+                <h4>Parâmetros gerais do CNPJ</h4>
+                <p>Percentuais com vigência global. A NF vale para todos os SKUs.</p>
+                <form id="analysis-rates-form">
+                  <label>Vigente a partir de<input id="rate-effective-from" type="date" required></label>
+                  <label>NF (%)<input id="rate-nf" type="number" min="0" max="100" step="0.01" required></label>
+                  <label>Ads (%)<input id="rate-ads" type="number" min="0" max="100" step="0.01" required></label>
+                  <label>Defeitos (%)<input id="rate-defects" type="number" min="0" max="100" step="0.01" required></label>
+                  <label>Custo operacional (%)<input id="rate-operational" type="number" min="0" max="100" step="0.01" required></label>
+                  <label>Estoque baixo com cobertura até (dias)<input id="rate-stock-alert" type="number" min="0" max="365" step="1" required></label>
+                  <button type="submit">Salvar parâmetros</button>
+                </form>
+              </section>
+              <section class="analysis-config-card">
+                <h4>Custo do produto por SKU/lote</h4>
+                <p>Informe o custo e a vigência. O custo mais recente válido será usado na análise atual.</p>
+                <form id="analysis-cost-form">
+                  <label>Anúncio<select id="cost-item" required></select></label>
+                  <label>SKU<input id="cost-sku" type="text" maxlength="100" required></label>
+                  <label>Lote<input id="cost-lot" type="text" maxlength="100" placeholder="Identificação do lote"></label>
+                  <label>Vigente a partir de<input id="cost-effective-from" type="date" required></label>
+                  <label>Custo unitário (R$)<input id="cost-unit" type="number" min="0" step="0.01" required></label>
+                  <label>Embalagem por unidade (R$)<input id="cost-packaging" type="number" min="0" step="0.01" value="0.50" required></label>
+                  <label>Quantidade recebida no lote<input id="cost-lot-quantity" type="number" min="0" step="1" placeholder="Opcional"></label>
+                  <button type="submit">Salvar custo do lote</button>
+                </form>
+              </section>
+            </div>
+            <div class="analysis-table-wrap">
+              <table class="analysis-table">
+                <thead><tr><th>ANÚNCIO / SKU</th><th>REPASSE PREVISTO</th><th>TARIFA ML</th><th>FRETE VENDEDOR</th><th>MARGEM ESTIMADA</th><th>ESTOQUE</th><th>COBERTURA</th><th>VALOR EM ESTOQUE</th></tr></thead>
+                <tbody id="margin-rows"></tbody>
+              </table>
+            </div>
+            <details class="analysis-history"><summary>Histórico de percentuais e custos</summary><div id="analysis-history"></div></details>
+          </section>
           <div class="account-list-tools"><label for="account-sort">Ordenar anúncios</label><select id="account-sort"><option value="title">Nome: A–Z</option><option value="price-asc">Preço de venda: menor primeiro</option><option value="price-desc">Preço de venda: maior primeiro</option><option value="stock-desc">Estoque: maior primeiro</option><option value="stock-asc">Estoque: menor primeiro</option></select><span>Ordena os anúncios desta página.</span></div>
           <div class="account-table-wrap">
             <table class="account-table">
