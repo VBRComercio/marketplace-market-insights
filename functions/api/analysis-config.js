@@ -78,7 +78,7 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
       operational_percent: validPercent(body.operational_percent),
       stock_alert_days: validRange(body.stock_alert_days, 0, 365)
     };
-    if (Object.values(rates).some((value) => value === null)) return json({ error: "Informe percentuais entre 0 e 100." }, 400);
+    if (Object.values(rates).some((value) => value === null)) return json({ error: "Percentuais devem ficar entre 0 e 100; o alerta de estoque, entre 0 e 365 dias." }, 400);
     await db.prepare(
       "INSERT INTO account_rate_history (seller_id, effective_from, nf_percent, ads_percent, defect_percent, operational_percent, stock_alert_days) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(seller_id, effective_from) DO UPDATE SET nf_percent = excluded.nf_percent, ads_percent = excluded.ads_percent, defect_percent = excluded.defect_percent, operational_percent = excluded.operational_percent, stock_alert_days = excluded.stock_alert_days"
     ).bind(String(sellerId), effectiveFrom, rates.nf_percent, rates.ads_percent, rates.defect_percent, rates.operational_percent, rates.stock_alert_days).run();
