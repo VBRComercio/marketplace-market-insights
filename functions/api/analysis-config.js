@@ -26,7 +26,7 @@ export async function onRequest({ request, env }) {
 }
 
 async function getConfig(request, db, sellerId, nickname, session, env, refreshed) {
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const today = brazilDateString();
   const ratesResult = await db.prepare(
     "SELECT effective_from, nf_percent, ads_percent, defect_percent, operational_percent, stock_alert_days FROM account_rate_history WHERE seller_id = ? AND effective_from <= ? ORDER BY effective_from DESC, id DESC LIMIT 1"
   ).bind(String(sellerId), today).first();
@@ -93,8 +93,8 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
     const unitCost = validMoney(body.unit_cost);
     const packagingCost = validMoney(body.packaging_cost);
     const lotQuantity = body.lot_quantity === "" || body.lot_quantity === null || body.lot_quantity === undefined ? null : validQuantity(body.lot_quantity);
-    if (!itemId || !sku || unitCost === null || packagingCost === null || (lotQuantity !== null && lotQuantity === false)) {
-      return json({ error: "Preencha anúncio, SKU, custo do produto e embalagem com valores válidos." }, 400);
+    if (!itemId || !sku || !lotCode || unitCost === null || packagingCost === null || (lotQuantity !== null && lotQuantity === false)) {
+      return json({ error: "Preencha anúncio, SKU, lote, custo do produto e embalagem com valores válidos." }, 400);
     }
     await db.batch([
       db.prepare(
@@ -159,6 +159,7 @@ async function refreshSession(session, env) {
   } catch { return null; }
 }
 
+function brazilDateString() { const parts = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()); const values = Object.fromEntries(parts.map((part) => [part.type, part.value])); return values.year + "-" + values.month + "-" + values.day; }
 function validDate(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const date = new Date(value + "T12:00:00-03:00");
