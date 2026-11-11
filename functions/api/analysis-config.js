@@ -1,7 +1,7 @@
 import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.js";
 
 const API_BASE = "https://api.mercadolibre.com";
-const DEFAULT_RATES = { nf_percent: 4, ads_percent: 2.5, defect_percent: 2, operational_percent: 5 };
+const DEFAULT_RATES = { nf_percent: 4, ads_percent: 2.5, defect_percent: 2, operational_percent: 5, stock_alert_days: 7 };
 
 export async function onRequest({ request, env }) {
   try {
@@ -28,7 +28,7 @@ export async function onRequest({ request, env }) {
 async function getConfig(request, db, sellerId, nickname, session, env, refreshed) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
   const ratesResult = await db.prepare(
-    "SELECT effective_from, nf_percent, ads_percent, defect_percent, operational_percent FROM account_rate_history WHERE seller_id = ? AND effective_from <= ? ORDER BY effective_from DESC, id DESC LIMIT 1"
+    "SELECT effective_from, nf_percent, ads_percent, defect_percent, operational_percent, stock_alert_days FROM account_rate_history WHERE seller_id = ? AND effective_from <= ? ORDER BY effective_from DESC, id DESC LIMIT 1"
   ).bind(String(sellerId), today).first();
   const url = new URL(request.url);
   const itemIds = [...new Set((url.searchParams.get("item_ids") || "").split(",").map((id) => id.trim()).filter((id) => /^[A-Z]{3}[0-9]+$/.test(id)))].slice(0, 50);
@@ -44,7 +44,7 @@ async function getConfig(request, db, sellerId, nickname, session, env, refreshe
     "SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity FROM (SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity, ROW_NUMBER() OVER (PARTITION BY sku ORDER BY effective_from DESC, id DESC) AS row_number FROM sku_cost_history WHERE seller_id = ? AND effective_from <= ?) WHERE row_number = 1"
   ).bind(String(sellerId), today).all();
   const ratesHistory = await db.prepare(
-    "SELECT effective_from, nf_percent, ads_percent, defect_percent, operational_percent FROM account_rate_history WHERE seller_id = ? ORDER BY effective_from DESC, id DESC LIMIT 100"
+    "SELECT effective_from, nf_percent, ads_percent, defect_percent, operational_percent, stock_alert_days FROM account_rate_history WHERE seller_id = ? ORDER BY effective_from DESC, id DESC LIMIT 100"
   ).bind(String(sellerId)).all();
   const costsHistory = await db.prepare(
     "SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity FROM sku_cost_history WHERE seller_id = ? ORDER BY effective_from DESC, id DESC LIMIT 250"
@@ -75,12 +75,13 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
       nf_percent: validPercent(body.nf_percent),
       ads_percent: validPercent(body.ads_percent),
       defect_percent: validPercent(body.defect_percent),
-      operational_percent: validPercent(body.operational_percent)
+      operational_percent: validPercent(body.operational_percent),
+      stock_alert_days: validPercent(body.stock_alert_days)
     };
     if (Object.values(rates).some((value) => value === null)) return json({ error: "Informe percentuais entre 0 e 100." }, 400);
     await db.prepare(
-      "INSERT INTO account_rate_history (seller_id, effective_from, nf_percent, ads_percent, defect_percent, operational_percent) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(seller_id, effective_from) DO UPDATE SET nf_percent = excluded.nf_percent, ads_percent = excluded.ads_percent, defect_percent = excluded.defect_percent, operational_percent = excluded.operational_percent"
-    ).bind(String(sellerId), effectiveFrom, rates.nf_percent, rates.ads_percent, rates.defect_percent, rates.operational_percent).run();
+      "INSERT INTO account_rate_history (seller_id, effective_from, nf_percent, ads_percent, defect_percent, operational_percent, stock_alert_days) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(seller_id, effective_from) DO UPDATE SET nf_percent = excluded.nf_percent, ads_percent = excluded.ads_percent, defect_percent = excluded.defect_percent, operational_percent = excluded.operational_percent, stock_alert_days = excluded.stock_alert_days"
+    ).bind(String(sellerId), effectiveFrom, rates.nf_percent, rates.ads_percent, rates.defect_percent, rates.operational_percent, rates.stock_alert_days).run();
     const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
     return json({ saved: true, type: "rates", effective_from: effectiveFrom, rates }, 200, headers);
   }
