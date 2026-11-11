@@ -196,20 +196,74 @@ async function loadPerformance() {
       return;
     }
     performanceByItem = new Map((Array.isArray(data.items) ? data.items : []).map((item) => [item.id, item]));
-    renderAccountItems({ items: accountItems, paging: accountPaging });
     performanceSummary.hidden = false;
+
+    let processedOrders = Number(data.orders?.scanned || 0);
+    let nextOrderOffset = data.sales_error ? null : data.orders?.next_offset;
+    let ordersWarning = data.sales_error || "";
+    while (nextOrderOffset !== null && nextOrderOffset !== undefined && !ordersWarning) {
+      performanceStatus.textContent = "Consultando pedidos: " + processedOrders.toLocaleString("pt-BR") + " de " + Number(data.orders?.total || 0).toLocaleString("pt-BR") + "…";
+      const params = new URLSearchParams({
+        days: String(days),
+        offset: String(nextOrderOffset),
+        date_from: String(data.date_from || ""),
+        date_to: String(data.date_to || "")
+      });
+      const continuationResponse = await fetch("/api/performance-orders?" + params.toString(), {
+        headers: { Accept: "application/json" },
+        cache: "no-store"
+      });
+      const continuationType = continuationResponse.headers.get("content-type") || "";
+      if (!continuationType.toLowerCase().includes("application/json")) {
+        ordersWarning = "O servidor retornou uma resposta inesperada ao continuar os pedidos (HTTP " + continuationResponse.status + ").";
+        break;
+      }
+      const continuation = await continuationResponse.json();
+      if (!continuationResponse.ok) {
+        ordersWarning = continuation?.error || "Não foi possível completar a consulta de pedidos.";
+        break;
+      }
+      for (const [itemId, sales] of Object.entries(continuation.sales_by_item || {})) {
+        const current = performanceByItem.get(itemId);
+        if (!current) continue;
+        performanceByItem.set(itemId, {
+          ...current,
+          units_sold: (Number(current.units_sold) || 0) + (Number(sales.units) || 0),
+          gross_sales: Math.round(((Number(current.gross_sales) || 0) + (Number(sales.gross) || 0)) * 100) / 100
+        });
+      }
+      const scannedNow = Number(continuation.orders?.scanned || 0);
+      processedOrders += scannedNow;
+      const followingOffset = continuation.orders?.next_offset;
+      if (!scannedNow && followingOffset !== null && followingOffset !== undefined) {
+        ordersWarning = "A consulta não avançou na paginação dos pedidos.";
+        break;
+      }
+      nextOrderOffset = followingOffset;
+    }
+
+    if (!data.sales_error) {
+      data.orders = { ...(data.orders || {}), scanned: processedOrders, partial: nextOrderOffset !== null && nextOrderOffset !== undefined, next_offset: nextOrderOffset };
+      data.totals.units_sold = [...performanceByItem.values()].reduce((sum, item) => sum + (Number(item.units_sold) || 0), 0);
+      data.totals.gross_sales = Math.round([...performanceByItem.values()].reduce((sum, item) => sum + (Number(item.gross_sales) || 0), 0) * 100) / 100;
+    }
+    renderAccountItems({ items: accountItems, paging: accountPaging });
+
     const formatNumber = (value) => value === null || value === undefined ? "N/D" : new Intl.NumberFormat("pt-BR").format(value);
     periodVisits.textContent = formatNumber(data.totals?.visits) + (data.visits_partial ? " · parcial" : "");
     periodUnits.textContent = formatNumber(data.totals?.units_sold) + (data.orders?.partial && data.totals?.units_sold !== null ? " · parcial" : "");
     periodGross.textContent = data.totals?.gross_sales === null || data.totals?.gross_sales === undefined ? "N/D" : accountMoney.format(data.totals.gross_sales) + (data.orders?.partial ? " · parcial" : "");
 
     const warnings = [];
-    if (data.sales_error) warnings.push("Vendas: " + data.sales_error);
+    if (ordersWarning) warnings.push("Vendas: " + ordersWarning);
     if (data.visits_error) warnings.push(data.visits_error);
     if (data.visits_partial && !data.visits_error) warnings.push("A API não retornou visitas para todos os anúncios desta página.");
     if (data.orders?.partial) warnings.push("Pedidos consultados parcialmente: " + Number(data.orders.scanned || 0).toLocaleString("pt-BR") + " de " + Number(data.orders.total || 0).toLocaleString("pt-BR") + ".");
     const seller = data.seller?.nickname ? "Conta " + data.seller.nickname + " · " : "";
-    performanceStatus.textContent = seller + "Período de " + days + " dias consultado." + (warnings.length ? " " + warnings.join(" ") : "");
+    const dateLabel = data.date_from && data.date_to
+      ? " (" + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date(data.date_from)) + " a " + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date(data.date_to)) + ")"
+      : "";
+    performanceStatus.textContent = seller + "Período de " + days + " dias consultado" + dateLabel + "." + (warnings.length ? " " + warnings.join(" ") : "");
     performanceStatus.className = "account-status" + (warnings.length ? " warning" : " success");
   } catch {
     performanceStatus.textContent = "Falha de conexão ao consultar vendas e visitas.";
