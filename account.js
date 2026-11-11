@@ -25,6 +25,20 @@ const periodUnits = document.querySelector("#period-units");
 const periodGross = document.querySelector("#period-gross");
 let performanceByItem = new Map();
 let loadingPerformance = false;
+const marginButton = document.querySelector("#load-margin-analysis");
+const analysisStatus = document.querySelector("#analysis-status");
+const analysisSummary = document.querySelector("#analysis-summary");
+const analysisTotalPayout = document.querySelector("#analysis-total-payout");
+const analysisTotalMargin = document.querySelector("#analysis-total-margin");
+const analysisStockValue = document.querySelector("#analysis-stock-value");
+const marginRows = document.querySelector("#margin-rows");
+const ratesForm = document.querySelector("#analysis-rates-form");
+const costForm = document.querySelector("#analysis-cost-form");
+const costItemSelect = document.querySelector("#cost-item");
+let analysisConfig = null;
+let marginByItem = new Map();
+let loadingAnalysisConfig = false;
+let loadingMarginAnalysis = false;
 
 function setAccountStatus(message, kind = "") {
   accountStatus.textContent = message;
@@ -77,6 +91,7 @@ async function loadAccountItems(offset = 0) {
     performanceStatus.textContent = "Escolha um período e clique em Consultar desempenho.";
     performanceStatus.className = "account-status";
     renderAccountItems(data);
+    await loadAnalysisConfig();
     const seller = data.seller?.nickname ? "Conta " + data.seller.nickname + " · " : "";
     const missingPrices = Number(data.pricing_unavailable_count || 0);
     setAccountStatus(seller + (missingPrices ? missingPrices + " preço(s) vigente(s) não retornado(s) pela API." : "Preços de venda atuais consultados no canal Mercado Livre."), missingPrices ? "warning" : "success");
@@ -132,6 +147,7 @@ function renderAccountItems(data) {
   }).join("");
 
   accountContent.hidden = false;
+  renderMarginTable();
   previousButton.disabled = currentOffset === 0;
   nextButton.disabled = !accountPaging.has_more || currentOffset >= 950;
 }
@@ -265,6 +281,7 @@ async function loadPerformance() {
       : "";
     performanceStatus.textContent = seller + "Período de " + days + " dias consultado" + dateLabel + "." + (warnings.length ? " " + warnings.join(" ") : "");
     performanceStatus.className = "account-status" + (warnings.length ? " warning" : " success");
+    renderMarginTable();
   } catch {
     performanceStatus.textContent = "Falha de conexão ao consultar vendas e visitas.";
     performanceStatus.className = "account-status error";
@@ -274,6 +291,231 @@ async function loadPerformance() {
   }
 }
 
+async function loadAnalysisConfig() {
+  if (loadingAnalysisConfig || !accountItems.length) return;
+  loadingAnalysisConfig = true;
+  setAnalysisStatus("Carregando cadastro de custos e percentuais…");
+  try {
+    const params = new URLSearchParams({ item_ids: accountItems.map((item) => item.id).join(",") });
+    const response = await fetch("/api/analysis-config?" + params.toString(), { headers: { Accept: "application/json" }, cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Não foi possível carregar o cadastro.");
+    analysisConfig = data;
+    fillAnalysisForms();
+    renderAnalysisHistory();
+    setAnalysisStatus("Cadastro carregado. Parâmetros gerais aplicam-se ao CNPJ; custos e lotes são vinculados ao SKU.", "success");
+    renderMarginTable();
+  } catch (error) {
+    setAnalysisStatus(error.message || "Falha ao carregar o cadastro.", "warning");
+  } finally {
+    loadingAnalysisConfig = false;
+  }
+}
+
+function todayInBrazil() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+}
+
+function setAnalysisStatus(message, kind = "") {
+  if (!analysisStatus) return;
+  analysisStatus.textContent = message;
+  analysisStatus.className = "account-status" + (kind ? " " + kind : "");
+}
+
+function fillAnalysisForms() {
+  if (!analysisConfig) return;
+  const rates = analysisConfig.rates || {};
+  document.querySelector("#rate-effective-from").value = rates.effective_from || todayInBrazil();
+  document.querySelector("#rate-nf").value = rates.nf_percent ?? 4;
+  document.querySelector("#rate-ads").value = rates.ads_percent ?? 2.5;
+  document.querySelector("#rate-defects").value = rates.defect_percent ?? 2;
+  document.querySelector("#rate-operational").value = rates.operational_percent ?? 5;
+  document.querySelector("#rate-stock-alert").value = rates.stock_alert_days ?? 7;
+  document.querySelector("#cost-effective-from").value = todayInBrazil();
+
+  const previousSelection = costItemSelect.value;
+  const mappings = new Map((analysisConfig.mappings || []).map((entry) => [entry.item_id, entry.sku]));
+  costItemSelect.innerHTML = '<option value="">Selecione um anúncio</option>' + accountItems.map((item) =>
+    '<option value="' + accountEsc(item.id) + '">' + accountEsc(item.title) + ' (' + accountEsc(item.id) + ')</option>'
+  ).join("");
+  if (accountItems.some((item) => item.id === previousSelection)) costItemSelect.value = previousSelection;
+  else if (accountItems.length) costItemSelect.value = accountItems[0].id;
+  populateCostFields(mappings);
+}
+
+function populateCostFields(mappings = new Map()) {
+  const selected = accountItems.find((item) => item.id === costItemSelect.value);
+  if (!selected) return;
+  const sku = mappings.get(selected.id) || selected.seller_sku || "";
+  document.querySelector("#cost-sku").value = sku;
+  const latest = (analysisConfig?.latest_costs || []).find((cost) => cost.sku === sku);
+  if (latest) {
+    document.querySelector("#cost-unit").value = latest.unit_cost;
+    document.querySelector("#cost-packaging").value = latest.packaging_cost;
+    document.querySelector("#cost-lot").value = "";
+  } else {
+    document.querySelector("#cost-unit").value = "";
+    document.querySelector("#cost-packaging").value = "0.50";
+    document.querySelector("#cost-lot").value = "";
+  }
+}
+
+function renderAnalysisHistory() {
+  const target = document.querySelector("#analysis-history");
+  if (!target || !analysisConfig) return;
+  const rates = analysisConfig.rates_history || [];
+  const costs = analysisConfig.costs_history || [];
+  const ratesMarkup = rates.length
+    ? '<ul>' + rates.map((entry) => '<li>' + accountEsc(entry.effective_from) + ': NF ' + accountEsc(entry.nf_percent) + '%, Ads ' + accountEsc(entry.ads_percent) + '%, defeitos ' + accountEsc(entry.defect_percent) + '%, operação ' + accountEsc(entry.operational_percent) + '%, alerta de estoque ' + accountEsc(entry.stock_alert_days) + ' dias</li>').join("") + '</ul>'
+    : '<p>Nenhuma versão de parâmetros salva.</p>';
+  const costsMarkup = costs.length
+    ? '<ul>' + costs.map((entry) => '<li>SKU ' + accountEsc(entry.sku) + (entry.lot_code ? ' · lote ' + accountEsc(entry.lot_code) : "") + ' · desde ' + accountEsc(entry.effective_from) + ' · produto ' + accountMoney.format(Number(entry.unit_cost)) + ' · embalagem ' + accountMoney.format(Number(entry.packaging_cost)) + '</li>').join("") + '</ul>'
+    : '<p>Nenhum custo por SKU/lote salvo.</p>';
+  target.innerHTML = '<h5>Parâmetros gerais do CNPJ</h5>' + ratesMarkup + '<h5>Custos por SKU e lote</h5>' + costsMarkup;
+}
+
+async function saveAnalysisForm(form, payload, successMessage) {
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  setAnalysisStatus("Salvando cadastro…");
+  try {
+    const response = await fetch("/api/analysis-config", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Não foi possível salvar.");
+    await loadAnalysisConfig();
+    setAnalysisStatus(successMessage + " Vigência: " + data.effective_from + ".", "success");
+  } catch (error) {
+    setAnalysisStatus(error.message || "Falha ao salvar o cadastro.", "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+ratesForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveAnalysisForm(ratesForm, {
+    type: "rates",
+    effective_from: document.querySelector("#rate-effective-from").value,
+    nf_percent: document.querySelector("#rate-nf").value,
+    ads_percent: document.querySelector("#rate-ads").value,
+    defect_percent: document.querySelector("#rate-defects").value,
+    operational_percent: document.querySelector("#rate-operational").value,
+    stock_alert_days: document.querySelector("#rate-stock-alert").value
+  }, "Parâmetros gerais salvos para todo o CNPJ.");
+});
+
+costItemSelect?.addEventListener("change", () => populateCostFields(new Map((analysisConfig?.mappings || []).map((entry) => [entry.item_id, entry.sku]))));
+costForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveAnalysisForm(costForm, {
+    type: "sku_cost",
+    item_id: costItemSelect.value,
+    sku: document.querySelector("#cost-sku").value,
+    lot_code: document.querySelector("#cost-lot").value,
+    effective_from: document.querySelector("#cost-effective-from").value,
+    unit_cost: document.querySelector("#cost-unit").value,
+    packaging_cost: document.querySelector("#cost-packaging").value
+  }, "Custo do SKU/lote salvo.");
+});
+
+async function loadMarginAnalysis() {
+  if (loadingMarginAnalysis || !accountItems.length) return;
+  loadingMarginAnalysis = true;
+  marginButton.disabled = true;
+  marginByItem = new Map();
+  setAnalysisStatus("Consultando tarifas e frete estimado na API do Mercado Livre…");
+  try {
+    const results = [];
+    for (let start = 0; start < accountItems.length; start += 20) {
+      setAnalysisStatus("Calculando " + Math.min(start + 20, accountItems.length).toLocaleString("pt-BR") + " de " + accountItems.length.toLocaleString("pt-BR") + " anúncios…");
+      const response = await fetch("/api/margin-estimates", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ items: accountItems.slice(start, start + 20) })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível calcular as margens.");
+      results.push(...(data.results || []));
+    }
+    marginByItem = new Map(results.map((entry) => [entry.id, entry]));
+    renderMarginTable();
+    const incomplete = results.filter((entry) => entry.missing?.length).length;
+    setAnalysisStatus(incomplete
+      ? "Análise concluída. " + incomplete + " anúncio(s) têm dados pendentes; veja os detalhes nas linhas."
+      : "Análise concluída. Repasse e frete são estimativas da API para o contexto atual.", incomplete ? "warning" : "success");
+  } catch (error) {
+    setAnalysisStatus(error.message || "Falha ao consultar tarifas e frete.", "error");
+  } finally {
+    loadingMarginAnalysis = false;
+    marginButton.disabled = false;
+  }
+}
+
+function renderMarginTable() {
+  if (!marginRows || !accountItems.length) return;
+  const formatValue = (value) => value === null || value === undefined ? "N/D" : accountMoney.format(Number(value));
+  const rows = accountItems.map((item) => {
+    const analysis = marginByItem.get(item.id);
+    const metrics = performanceByItem.get(item.id);
+    const quantity = item.available_quantity === null || item.available_quantity === undefined ? null : Number(item.available_quantity);
+    const units = metrics?.units_sold === null || metrics?.units_sold === undefined ? null : Number(metrics.units_sold);
+    const periodDays = Number(performanceDays?.value) || 30;
+    const dailySales = units === null ? null : units / periodDays;
+    const coverage = dailySales === null ? "Consulte desempenho" : dailySales > 0 ? quantity === null ? "N/D" : (quantity / dailySales).toFixed(1).replace(".", ",") + " dias" : "Sem vendas";
+    const coverageValue = dailySales > 0 && quantity !== null ? quantity / dailySales : null;
+    const alertDays = Number(analysisConfig?.rates?.stock_alert_days ?? 7);
+    const coverageClass = coverageValue !== null && coverageValue <= alertDays ? "low-stock" : coverageValue !== null ? "good-stock" : "";
+    const stockValue = quantity !== null && analysis?.unit_cost !== null && analysis?.unit_cost !== undefined ? quantity * Number(analysis.unit_cost) : null;
+    const missingTitle = analysis?.missing?.length ? '<small>' + accountEsc(analysis.missing.join(" ")) + '</small>' : "";
+    const payout = analysis?.contribution_margin;
+    const estimated = analysis?.estimated_margin;
+    const details = analysis ? '<small>SKU ' + accountEsc(analysis.sku || "não vinculado") + '</small>' : '<small>Atualize a análise</small>';
+    return '<tr><td><strong>' + accountEsc(item.title) + '</strong><small>' + accountEsc(item.id) + '</small>' + details + missingTitle + '</td>' +
+      '<td>' + formatValue(payout) + '</td><td>' + formatValue(analysis?.sale_fee) + '</td><td>' + formatValue(analysis?.seller_shipping) + '</td>' +
+      '<td>' + (analysis?.unit_cost === null || analysis?.unit_cost === undefined ? "N/D" : formatValue(Number(analysis.unit_cost) + Number(analysis.packaging_cost || 0))) + '</td>' +
+      '<td>' + formatValue(estimated) + '</td><td>' + (quantity === null ? "N/D" : new Intl.NumberFormat("pt-BR").format(quantity)) + '</td>' +
+      '<td class="' + coverageClass + '">' + accountEsc(coverage) + '</td><td>' + formatValue(stockValue) + '</td></tr>';
+  });
+  marginRows.innerHTML = rows.join("");
+
+  if (!marginByItem.size) {
+    analysisTotalPayout.textContent = "—";
+    analysisTotalMargin.textContent = "—";
+    analysisStockValue.textContent = "—";
+    const lowStockElement = document.querySelector("#analysis-low-stock-count");
+    if (lowStockElement) lowStockElement.textContent = "—";
+    analysisSummary.hidden = true;
+    return;
+  }
+  const completePayout = accountItems.length > 0 && accountItems.every((item) => marginByItem.get(item.id)?.contribution_margin !== null && marginByItem.get(item.id)?.contribution_margin !== undefined);
+  const completeMargin = accountItems.length > 0 && accountItems.every((item) => marginByItem.get(item.id)?.estimated_margin !== null && marginByItem.get(item.id)?.estimated_margin !== undefined);
+  const knownStock = accountItems.reduce((sum, item) => {
+    const entry = marginByItem.get(item.id);
+    return sum + (item.available_quantity !== null && item.available_quantity !== undefined && entry?.unit_cost !== null && entry?.unit_cost !== undefined ? Number(item.available_quantity) * Number(entry.unit_cost) : 0);
+  }, 0);
+  const completeStock = accountItems.every((item) => item.available_quantity !== null && item.available_quantity !== undefined && marginByItem.get(item.id)?.unit_cost !== null && marginByItem.get(item.id)?.unit_cost !== undefined);
+  analysisTotalPayout.textContent = completePayout ? formatValue(accountItems.reduce((sum, item) => sum + Number(marginByItem.get(item.id).contribution_margin), 0)) : "Dados parciais";
+  analysisTotalMargin.textContent = completeMargin ? formatValue(accountItems.reduce((sum, item) => sum + Number(marginByItem.get(item.id).estimated_margin), 0)) : "Dados parciais";
+  analysisStockValue.textContent = marginByItem.size ? formatValue(knownStock) + (completeStock ? "" : " · parcial") : "—";
+  const lowStockCount = accountItems.filter((item) => {
+    const metrics = performanceByItem.get(item.id);
+    const qty = item.available_quantity === null || item.available_quantity === undefined ? null : Number(item.available_quantity);
+    const soldUnits = metrics?.units_sold;
+    const daily = soldUnits === null || soldUnits === undefined ? null : Number(soldUnits) / (Number(performanceDays?.value) || 30);
+    return daily > 0 && qty !== null && Number.isFinite(qty) && qty / daily <= Number(analysisConfig?.rates?.stock_alert_days ?? 7);
+  }).length;
+  const lowStockElement = document.querySelector("#analysis-low-stock-count");
+  if (lowStockElement) lowStockElement.textContent = performanceByItem.size ? String(lowStockCount) : "Consulte desempenho";
+  analysisSummary.hidden = false;
+}
+
+marginButton?.addEventListener("click", loadMarginAnalysis);
 performanceButton.addEventListener("click", loadPerformance);
 
 loadItemsButton.addEventListener("click", () => loadAccountItems(0));
