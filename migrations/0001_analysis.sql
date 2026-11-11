@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS sku_cost_history (
   effective_from TEXT NOT NULL,
   unit_cost REAL NOT NULL,
   packaging_cost REAL NOT NULL DEFAULT 0,
-  lot_quantity INTEGER,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (seller_id, sku, lot_code, effective_from)
 );
