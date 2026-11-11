@@ -83,7 +83,7 @@ async function search(query) {
   button.disabled = true;
   button.innerHTML = "Buscando <span>…</span>";
   statusEl.className = "status";
-  statusEl.textContent = "Consultando anúncios no Mercado Livre…";
+  statusEl.textContent = "Consultando anúncios e preços vigentes no Mercado Livre…";
   resultsEl.hidden = true;
   try {
     const response = await fetch("/api/search?q=" + encodeURIComponent(query), { headers: { Accept: "application/json" }, cache: "no-store" });
@@ -125,17 +125,19 @@ function renderResults(query, data) {
   document.querySelector("#listing-count").textContent = new Intl.NumberFormat("pt-BR").format(items.length);
   document.querySelector("#min-title").textContent = minItem ? shortText(minItem.title, 32) : "nenhum preço disponível";
   document.querySelector("#max-title").textContent = maxItem ? shortText(maxItem.title, 32) : "nenhum preço disponível";
-  document.querySelector("#result-count").textContent = "Exibindo " + items.length + " de " + Number(data.paging?.total || items.length).toLocaleString("pt-BR") + " anúncios encontrados";
+  const unavailablePrices = items.filter((item) => item.price_source !== "sale_price").length;
+  document.querySelector("#result-count").textContent = "Exibindo " + items.length + " de " + Number(data.paging?.total || items.length).toLocaleString("pt-BR") + " anúncios encontrados" + (unavailablePrices ? " · preço vigente indisponível para " + unavailablePrices : " · preço vigente consultado no Marketplace");
   document.querySelector("#empty-results").hidden = items.length > 0;
   rowsEl.innerHTML = items.map((item) => {
     const picture = item.thumbnail ? '<img src="' + escapeHTML(item.thumbnail) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="image-placeholder">◇</span>';
     const condition = item.condition === "new" ? "Novo" : item.condition === "used" ? "Usado" : "Ver anúncio";
     const sellerId = item.seller?.id ? "Vendedor #" + escapeHTML(item.seller.id) : "—";
-    const currentPrice = item.price !== null && item.price !== undefined && Number.isFinite(Number(item.price)) ? money.format(Number(item.price)) : "—";
-    const hasRegularPrice = item.regular_price !== null && item.regular_price !== undefined && Number.isFinite(Number(item.regular_price)) && Number(item.regular_price) > Number(item.price);
+    const hasPrice = item.price !== null && item.price !== undefined && item.price !== "" && Number.isFinite(Number(item.price));
+    const currentPrice = hasPrice ? money.format(Number(item.price)) : "Preço vigente indisponível";
+    const hasRegularPrice = hasPrice && item.regular_price !== null && item.regular_price !== undefined && Number.isFinite(Number(item.regular_price)) && Number(item.regular_price) > Number(item.price);
     const priceMarkup = hasRegularPrice
       ? '<span class="price-current">' + currentPrice + '</span><small class="price-regular">' + money.format(Number(item.regular_price)) + '</small><span class="promo-label">PROMOÇÃO</span>'
-      : '<span class="price-current">' + currentPrice + '</span>';
+      : hasPrice ? '<span class="price-current">' + currentPrice + '</span>' : '<small class="price-unavailable">Preço de venda indisponível</small>';
     return "<tr><td><div class=\"item\">" + picture + "<div><div class=\"item-title\">" + escapeHTML(item.title) + "</div><div class=\"item-id\">" + escapeHTML(item.id) + "</div></div></div></td><td class=\"price\">"  + priceMarkup + "</td><td><span class=\"condition\">" + condition + "</span></td><td class=\"seller\">" + sellerId + "</td><td><a class=\"open-link\" href=\"" + escapeHTML(item.permalink || "#") + "\" target=\"_blank\" rel=\"noreferrer\" aria-label=\"Abrir anúncio em nova aba\">↗</a></td></tr>";
   }).join("");
   resultsEl.hidden = false;
