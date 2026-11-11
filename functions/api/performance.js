@@ -70,8 +70,8 @@ async function handleRequest(request, env) {
   const itemIds = Array.isArray(itemSearch.results) ? itemSearch.results : [];
   const visitIds = itemIds.slice(0, MAX_VISIT_LOOKUPS);
   const ending = new Date().toISOString().slice(0, 10);
-  let dateFrom = new Date(Date.now() - days * 86_400_000).toISOString();
-  let dateTo = new Date().toISOString();
+  let dateTo = ending + "T00:00:00.000Z";
+  let dateFrom = new Date(Date.parse(dateTo) - days * 86_400_000).toISOString();
 
   const visits = {};
   const visitDateRanges = [];
@@ -106,11 +106,10 @@ async function handleRequest(request, env) {
   }
 
   const ordersUrl = new URL(API_BASE + "/orders/search");
-  const isoStartFallback = new Date(Date.now() - days * 86_400_000).toISOString();
   ordersUrl.searchParams.set("seller", String(me.id));
   ordersUrl.searchParams.set("order.status", "paid");
-  ordersUrl.searchParams.set("order.date_created.from", dateFrom || isoStartFallback);
-  ordersUrl.searchParams.set("order.date_created.to", dateTo);
+  ordersUrl.searchParams.set("order.date_created.from", formatOrdersDate(dateFrom));
+  ordersUrl.searchParams.set("order.date_created.to", formatOrdersDate(dateTo));
   ordersUrl.searchParams.set("sort", "date_desc");
   ordersUrl.searchParams.set("limit", String(ORDER_PAGE_SIZE));
 
@@ -170,12 +169,18 @@ async function handleRequest(request, env) {
       units_sold: salesError ? null : items.reduce((sum, item) => sum + (item.units_sold || 0), 0),
       gross_sales: salesError ? null : Math.round(items.reduce((sum, item) => sum + (item.gross_sales || 0), 0) * 100) / 100
     },
-    orders: { scanned: ordersScanned, total: ordersTotal, partial: ordersPartial },
+    orders: { scanned: ordersScanned, total: ordersTotal, partial: ordersPartial, next_offset: ordersPartial ? ordersScanned : null },
     visits_partial: itemIds.length > visitIds.length || visitFailures.length > 0,
     visits_unavailable_count: itemIds.length - Object.values(visits).filter((value) => value !== null).length,
     sales_error: salesError,
     visits_error: visitFailures.length ? "A API não retornou visitas para " + visitFailures.length + " anúncio(s)." : null
   }, 200, headers);
+}
+
+function formatOrdersDate(value) {
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) throw new Error("Data inválida para consulta de pedidos.");
+  return parsed.toISOString().replace(/Z$/, "-00:00");
 }
 
 function finiteAmount(value) {
