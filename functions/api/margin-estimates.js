@@ -33,14 +33,27 @@ export async function onRequestPost({ request, env }) {
 
     let currentSession = session;
     let refreshedSession = refreshed;
+    let refreshPromise = null;
     const requestApi = async (url) => {
-      const response = await fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + currentSession.access_token } });
-      if (response.status !== 401 || refreshedSession) return response;
-      const next = await refreshSession(currentSession, env);
-      if (!next) return response;
-      currentSession = next;
-      refreshedSession = true;
-      return fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + currentSession.access_token } });
+      const tokenUsed = currentSession.access_token;
+      let response = await fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + tokenUsed } });
+      if (response.status !== 401) return response;
+      if (currentSession.access_token !== tokenUsed) {
+        return fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + currentSession.access_token } });
+      }
+      if (!refreshedSession) {
+        if (!refreshPromise) refreshPromise = refreshSession(currentSession, env);
+        const next = await refreshPromise;
+        if (next) {
+          currentSession = next;
+          refreshedSession = true;
+          refreshPromise = null;
+        }
+      }
+      if (currentSession.access_token !== tokenUsed) {
+        response = await fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + currentSession.access_token } });
+      }
+      return response;
     };
 
     const results = await Promise.all(items.map(async (item) => {
