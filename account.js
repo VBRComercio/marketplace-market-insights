@@ -14,6 +14,8 @@ const accountEsc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => 
 let currentOffset = 0;
 let accountPaging = null;
 let loadingItems = false;
+let accountItems = [];
+const accountSort = document.querySelector("#account-sort");
 
 function setAccountStatus(message, kind = "") {
   accountStatus.textContent = message;
@@ -77,6 +79,7 @@ async function loadAccountItems(offset = 0) {
 
 function renderAccountItems(data) {
   const items = Array.isArray(data.items) ? data.items : [];
+  accountItems = items;
   accountPaging = data.paging || { total: items.length, limit: 50, offset: currentOffset, has_more: false };
   currentOffset = Number(accountPaging.offset) || 0;
   const total = Number(accountPaging.total || 0);
@@ -90,7 +93,8 @@ function renderAccountItems(data) {
     : "Nenhum anúncio ativo encontrado";
   scanNote.hidden = !accountPaging.scan_required;
 
-  accountRows.innerHTML = items.map((item) => {
+  const sortedItems = [...items].sort((a, b) => compareAccountItems(a, b, accountSort?.value || "title"));
+  accountRows.innerHTML = sortedItems.map((item) => {
     const picture = item.thumbnail
       ? '<img src="' + accountEsc(item.thumbnail) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
       : '<span class="account-image-placeholder">◇</span>';
@@ -113,6 +117,29 @@ function renderAccountItems(data) {
   previousButton.disabled = currentOffset === 0;
   nextButton.disabled = !accountPaging.has_more || currentOffset >= 950;
 }
+
+function compareAccountItems(a, b, mode) {
+  const titleCompare = String(a.title || "").localeCompare(String(b.title || ""), "pt-BR", { sensitivity: "base" });
+  const priceA = Number.isFinite(Number(a.price)) && a.price !== null && a.price !== "" ? Number(a.price) : null;
+  const priceB = Number.isFinite(Number(b.price)) && b.price !== null && b.price !== "" ? Number(b.price) : null;
+  const stockA = Number(a.available_quantity) || 0;
+  const stockB = Number(b.available_quantity) || 0;
+  if (mode === "price-asc" || mode === "price-desc") {
+    if (priceA === null) return priceB === null ? titleCompare : 1;
+    if (priceB === null) return -1;
+    return (priceA - priceB) * (mode === "price-asc" ? 1 : -1) || titleCompare;
+  }
+  if (mode === "stock-asc" || mode === "stock-desc") return (stockA - stockB) * (mode === "stock-asc" ? 1 : -1) || titleCompare;
+  return titleCompare;
+}
+
+accountSort?.addEventListener("change", () => {
+  if (accountItems.length) {
+    accountRows.innerHTML = "";
+    const currentData = { items: accountItems, paging: accountPaging };
+    renderAccountItems(currentData);
+  }
+});
 
 loadItemsButton.addEventListener("click", () => loadAccountItems(0));
 previousButton.addEventListener("click", () => loadAccountItems(Math.max(0, currentOffset - 50)));
