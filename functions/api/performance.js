@@ -94,6 +94,7 @@ async function handleRequest(request, env) {
     }
   });
 
+  await Promise.all(visitRequests);
   if (visitDateRanges.length) {
     dateFrom = visitDateRanges[0].from;
     dateTo = visitDateRanges[0].to;
@@ -148,7 +149,6 @@ async function handleRequest(request, env) {
     salesError = "Não foi possível consultar pedidos agora.";
   }
 
-  await Promise.all(visitRequests);
   const items = itemIds.map((id) => {
     const sales = salesByItem[id] || { units: 0, gross: 0 };
     return { id, visits: visits[id] ?? null, units_sold: salesError ? null : sales.units, gross_sales: salesError ? null : Math.round(sales.gross * 100) / 100 };
