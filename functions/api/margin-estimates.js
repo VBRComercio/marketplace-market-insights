@@ -16,7 +16,7 @@ export async function onRequestPost({ request, env }) {
     if (auth.response) return auth.response;
     const { session, seller, refreshed } = auth;
     const sellerId = String(seller.id);
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const today = brazilDateString();
     const rates = await env.DB.prepare(
       "SELECT nf_percent, ads_percent, defect_percent, operational_percent FROM account_rate_history WHERE seller_id = ? AND effective_from <= ? ORDER BY effective_from DESC, id DESC LIMIT 1"
     ).bind(sellerId, today).first() || FALLBACK_RATES;
@@ -79,7 +79,8 @@ export async function onRequestPost({ request, env }) {
       let sellerShipping = null;
       if (feesResponse.ok) {
         const payload = await feesResponse.json().catch(() => null);
-        const fee = Array.isArray(payload) ? payload.find((entry) => entry.listing_type_id === listingType) || payload[0] : payload;
+        const feeEntries = Array.isArray(payload) ? payload.flat(4) : [payload];
+        const fee = feeEntries.find((entry) => entry?.listing_type_id === listingType) || feeEntries[0];
         saleFee = amount(fee?.sale_fee_amount);
       } else missing.push("Tarifa de venda indisponível.");
       if (shippingResponse.ok) {
@@ -157,6 +158,7 @@ async function refreshSession(session, env) {
       : null;
   } catch { return null; }
 }
+function brazilDateString() { const parts = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()); const values = Object.fromEntries(parts.map((part) => [part.type, part.value])); return values.year + "-" + values.month + "-" + values.day; }
 function safeText(value) { return typeof value === "string" && value.trim() ? value.trim().slice(0, 100) : ""; }
 function amount(value) { const number = Number(value); return value !== null && value !== undefined && value !== "" && Number.isFinite(number) && number >= 0 ? number : null; }
 function round(value) { return Math.round(value * 100) / 100; }
