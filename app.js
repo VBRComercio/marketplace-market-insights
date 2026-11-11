@@ -131,7 +131,12 @@ function renderResults(query, data) {
     const picture = item.thumbnail ? '<img src="' + escapeHTML(item.thumbnail) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="image-placeholder">◇</span>';
     const condition = item.condition === "new" ? "Novo" : item.condition === "used" ? "Usado" : "Ver anúncio";
     const sellerId = item.seller?.id ? "Vendedor #" + escapeHTML(item.seller.id) : "—";
-    return "<tr><td><div class=\"item\">" + picture + "<div><div class=\"item-title\">" + escapeHTML(item.title) + "</div><div class=\"item-id\">" + escapeHTML(item.id) + "</div></div></div></td><td class=\"price\">" + (Number.isFinite(Number(item.price)) ? money.format(Number(item.price)) : "—") + "</td><td><span class=\"condition\">" + condition + "</span></td><td class=\"seller\">" + sellerId + "</td><td><a class=\"open-link\" href=\"" + escapeHTML(item.permalink || "#") + "\" target=\"_blank\" rel=\"noreferrer\" aria-label=\"Abrir anúncio em nova aba\">↗</a></td></tr>";
+    const currentPrice = item.price !== null && item.price !== undefined && Number.isFinite(Number(item.price)) ? money.format(Number(item.price)) : "—";
+    const hasRegularPrice = item.regular_price !== null && item.regular_price !== undefined && Number.isFinite(Number(item.regular_price)) && Number(item.regular_price) > Number(item.price);
+    const priceMarkup = hasRegularPrice
+      ? '<span class="price-current">' + currentPrice + '</span><small class="price-regular">' + money.format(Number(item.regular_price)) + '</small><span class="promo-label">PROMOÇÃO</span>'
+      : '<span class="price-current">' + currentPrice + '</span>';
+    return "<tr><td><div class=\"item\">" + picture + "<div><div class=\"item-title\">" + escapeHTML(item.title) + "</div><div class=\"item-id\">" + escapeHTML(item.id) + "</div></div></div></td><td class=\"price\">"  + priceMarkup + "</td><td><span class=\"condition\">" + condition + "</span></td><td class=\"seller\">" + sellerId + "</td><td><a class=\"open-link\" href=\"" + escapeHTML(item.permalink || "#") + "\" target=\"_blank\" rel=\"noreferrer\" aria-label=\"Abrir anúncio em nova aba\">↗</a></td></tr>";
   }).join("");
   resultsEl.hidden = false;
 }
