@@ -78,12 +78,12 @@
           </div>
           <section class="analysis-panel" aria-labelledby="analysis-heading">
             <div class="analysis-heading">
-              <div><div class="eyebrow"><span class="eyebrow-line"></span> RENTABILIDADE E ESTOQUE</div><h3 id="analysis-heading">Margem e estoque</h3><p>Repasse previsto e margens via API; cobertura usa o período selecionado. Valor parado é estimado pela quantidade da API e pelo último custo vigente.</p></div>
+              <div><div class="eyebrow"><span class="eyebrow-line"></span> RENTABILIDADE E ESTOQUE</div><h3 id="analysis-heading">Margem e estoque</h3><p>A margem de contribuição representa o repasse previsto. A margem estimada desconta os custos cadastrados; a cobertura usa o período selecionado.</p></div>
               <button type="button" id="load-margin-analysis">Atualizar análise</button>
             </div>
             <div id="analysis-status" class="account-status" role="status" aria-live="polite">Carregue os anúncios para consultar margens e estoque.</div>
             <div id="analysis-summary" class="account-summary analysis-summary" hidden>
-              <article><span>REPASSE PREVISTO NA PÁGINA</span><strong id="analysis-total-payout">—</strong></article>
+              <article><span>MARGEM DE CONTRIBUIÇÃO · REPASSE PREVISTO</span><strong id="analysis-total-payout">—</strong></article>
               <article><span>MARGEM ESTIMADA NA PÁGINA</span><strong id="analysis-total-margin">—</strong></article>
               <article><span>VALOR ESTIMADO EM ESTOQUE</span><strong id="analysis-stock-value">—</strong></article>
               <article><span>ANÚNCIOS COM ESTOQUE BAIXO</span><strong id="analysis-low-stock-count">—</strong></article>
@@ -118,7 +118,7 @@
             </div>
             <div class="analysis-table-wrap">
               <table class="analysis-table">
-                <thead><tr><th>ANÚNCIO / SKU</th><th>REPASSE PREVISTO</th><th>TARIFA ML</th><th>FRETE VENDEDOR</th><th>CUSTO SKU + EMBALAGEM</th><th>MARGEM ESTIMADA</th><th>ESTOQUE</th><th>COBERTURA</th><th>VALOR EM ESTOQUE</th></tr></thead>
+                <thead><tr><th>ANÚNCIO / SKU</th><th>MARGEM DE CONTRIBUIÇÃO / REPASSE</th><th>TARIFA ML</th><th>FRETE VENDEDOR</th><th>CUSTO SKU + EMBALAGEM</th><th>MARGEM ESTIMADA</th><th>ESTOQUE</th><th>COBERTURA</th><th>VALOR EM ESTOQUE</th></tr></thead>
                 <tbody id="margin-rows"></tbody>
               </table>
             </div>
