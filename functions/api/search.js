@@ -91,14 +91,14 @@ async function handleSearch({ request, env }) {
         const sale = item.id ? await fetchSalePrice(item.id, authorizedFetch) : null;
         const saleAmount = finiteAmount(sale?.amount);
         const regularAmount = finiteAmount(sale?.regular_amount) ?? finiteAmount(item.original_price);
-        const currentAmount = saleAmount ?? finiteAmount(item.price);
+        const currentAmount = saleAmount;
         return {
           id: item.id,
           title: item.title,
           price: currentAmount,
           regular_price: regularAmount,
           is_promotional: currentAmount !== null && regularAmount !== null && regularAmount > currentAmount,
-          price_source: saleAmount === null ? "search" : "sale_price",
+          price_source: saleAmount === null ? "unavailable" : "sale_price",
           currency_id: sale?.currency_id || item.currency_id,
           condition: item.condition,
           thumbnail: item.thumbnail,
