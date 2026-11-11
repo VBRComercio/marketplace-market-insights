@@ -43,6 +43,9 @@ As chamadas à API são feitas no servidor com o access token. Access token e re
 
 ## Cadastro de custos e parâmetros de margem
 
-A funcionalidade de cadastro usa um banco Cloudflare D1. Crie um banco D1 e associe-o às Pages Functions com o binding `DB`. Aplique `migrations/0001_analysis.sql` ao banco antes de habilitar o cadastro. O código reconhece a ausência do binding/migração e informa o problema sem interromper as páginas existentes.
+A funcionalidade de cadastro usa um banco Cloudflare D1. Na conta Cloudflare, crie um banco D1; no projeto Pages, em **Settings → Functions → D1 database bindings**, adicione um binding chamado `DB` apontando para esse banco. No console SQL do D1, execute o conteúdo de `migrations/0001_analysis.sql` e faça um novo deploy. O código reconhece a ausência do binding/migração e informa o problema sem interromper as páginas existentes.
 
 Os registros são isolados pelo ID da conta autenticada no Mercado Livre. A tabela de percentuais guarda uma vigência global por conta (incluindo NF do CNPJ). Custos e embalagens são mantidos por SKU, lote e data de início; a associação entre SKU e anúncio também é armazenada. As rotas exigem sessão OAuth e não expõem o token no navegador.
+
+
+O painel identifica o repasse como estimativa calculada com a tarifa de venda e a cotação aproximada de envio que a API retorna para o contexto do anúncio. A estimativa pode divergir do valor liquidado em uma venda real. O valor de estoque é uma estimativa com base na quantidade atual da API e no custo unitário vigente cadastrado; a cobertura usa as unidades vendidas no período selecionado.
