@@ -31,3 +31,5 @@
 .account-foot button:disabled{opacity:.45;cursor:not-allowed}
 .account-note{margin:12px 0 0;color:#b54708;font-size:11px;line-height:1.5}
 @media(max-width:700px){.account-section{padding:17px 13px}.account-heading{align-items:flex-start;flex-direction:column}.account-load{width:100%}.account-summary{grid-template-columns:1fr;gap:8px}.account-summary article{display:flex;align-items:center;justify-content:space-between;padding:10px 12px}.account-summary article strong{font-size:18px;margin:0}.account-foot{align-items:flex-start;flex-direction:column}.account-foot div{width:100%}.account-foot button{flex:1}}
+
+.price-current{display:block;font-weight:700;color:#182230}.price-regular{display:block;margin-top:3px;color:#98a2b3;font-size:9px;text-decoration:line-through}.promo-label{display:inline-block;margin-top:4px;padding:3px 6px;border-radius:12px;background:#eaf8f1;color:#067647;font-size:8px;font-weight:700;letter-spacing:.4px}.price-unavailable{display:block;color:#b54708;font-size:9px;line-height:1.4}.account-status.warning{color:#b54708}
