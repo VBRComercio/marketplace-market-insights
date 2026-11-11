@@ -367,7 +367,7 @@ function renderAnalysisHistory() {
     ? '<ul>' + rates.map((entry) => '<li>' + accountEsc(entry.effective_from) + ': NF ' + accountEsc(entry.nf_percent) + '%, Ads ' + accountEsc(entry.ads_percent) + '%, defeitos ' + accountEsc(entry.defect_percent) + '%, operação ' + accountEsc(entry.operational_percent) + '%, alerta de estoque ' + accountEsc(entry.stock_alert_days) + ' dias</li>').join("") + '</ul>'
     : '<p>Nenhuma versão de parâmetros salva.</p>';
   const costsMarkup = costs.length
-    ? '<ul>' + costs.map((entry) => '<li>SKU ' + accountEsc(entry.sku) + (entry.lot_code ? ' · lote ' + accountEsc(entry.lot_code) : "") + ' · desde ' + accountEsc(entry.effective_from) + ' · produto ' + accountMoney.format(Number(entry.unit_cost)) + ' · embalagem ' + accountMoney.format(Number(entry.packaging_cost)) + (entry.lot_quantity === null ? "" : ' · recebidas ' + accountEsc(entry.lot_quantity)) + '</li>').join("") + '</ul>'
+    ? '<ul>' + costs.map((entry) => '<li>SKU ' + accountEsc(entry.sku) + (entry.lot_code ? ' · lote ' + accountEsc(entry.lot_code) : "") + ' · desde ' + accountEsc(entry.effective_from) + ' · produto ' + accountMoney.format(Number(entry.unit_cost)) + ' · embalagem ' + accountMoney.format(Number(entry.packaging_cost)) + + '</li>').join("") + '</ul>'
     : '<p>Nenhum custo por SKU/lote salvo.</p>';
   target.innerHTML = '<h5>Parâmetros gerais do CNPJ</h5>' + ratesMarkup + '<h5>Custos por SKU e lote</h5>' + costsMarkup;
 }
@@ -418,7 +418,6 @@ costForm?.addEventListener("submit", (event) => {
     effective_from: document.querySelector("#cost-effective-from").value,
     unit_cost: document.querySelector("#cost-unit").value,
     packaging_cost: document.querySelector("#cost-packaging").value,
-    lot_quantity: document.querySelector("#cost-lot-quantity").value
   }, "Custo do SKU/lote salvo.");
 });
 
