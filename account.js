@@ -20,6 +20,7 @@ const performanceButton = document.querySelector("#load-performance");
 const performanceDays = document.querySelector("#performance-days");
 const performanceStatus = document.querySelector("#performance-status");
 const performanceSummary = document.querySelector("#performance-summary");
+const performanceRows = document.querySelector("#performance-rows");
 const periodVisits = document.querySelector("#period-visits");
 const periodUnits = document.querySelector("#period-units");
 const periodGross = document.querySelector("#period-gross");
@@ -147,9 +148,25 @@ function renderAccountItems(data) {
   }).join("");
 
   accountContent.hidden = false;
+  renderPerformanceRows();
   renderMarginTable();
   previousButton.disabled = currentOffset === 0;
   nextButton.disabled = !accountPaging.has_more || currentOffset >= 950;
+}
+
+
+function renderPerformanceRows() {
+  if (!performanceRows) return;
+  performanceRows.innerHTML = accountItems.map((item) => {
+    const metrics = performanceByItem.get(item.id);
+    const visits = metrics?.visits === null ? "N/D" : metrics?.visits === undefined ? "—" : new Intl.NumberFormat("pt-BR").format(metrics.visits);
+    const units = metrics?.units_sold === null ? "N/D" : metrics?.units_sold === undefined ? "—" : new Intl.NumberFormat("pt-BR").format(metrics.units_sold);
+    const gross = metrics?.gross_sales === null ? "N/D" : metrics?.gross_sales === undefined ? "—" : accountMoney.format(metrics.gross_sales);
+    const link = item.permalink ? accountEsc(item.permalink) : "#";
+    return '<tr><td><div class="account-item"><div><strong>' + accountEsc(item.title) + '</strong><small>' + accountEsc(item.id) + '</small></div></div></td>' +
+      '<td>' + visits + '</td><td>' + units + '</td><td>' + gross + '</td>' +
+      '<td><a class="open-link" href="' + link + '" target="_blank" rel="noreferrer" aria-label="Abrir anúncio em nova aba">↗</a></td></tr>';
+  }).join("");
 }
 
 function compareAccountItems(a, b, mode) {
@@ -264,6 +281,7 @@ async function loadPerformance() {
       data.totals.gross_sales = Math.round([...performanceByItem.values()].reduce((sum, item) => sum + (Number(item.gross_sales) || 0), 0) * 100) / 100;
     }
     renderAccountItems({ items: accountItems, paging: accountPaging });
+    renderPerformanceRows();
 
     const formatNumber = (value) => value === null || value === undefined ? "N/D" : new Intl.NumberFormat("pt-BR").format(value);
     periodVisits.textContent = formatNumber(data.totals?.visits) + (data.visits_partial ? " · parcial" : "");
@@ -522,7 +540,38 @@ loadItemsButton.addEventListener("click", () => loadAccountItems(0));
 previousButton.addEventListener("click", () => loadAccountItems(Math.max(0, currentOffset - 50)));
 nextButton.addEventListener("click", () => loadAccountItems(currentOffset + 50));
 
-document.querySelectorAll(".side-link").forEach((link) => link.addEventListener("click", () => {
-  document.querySelectorAll(".side-link").forEach((candidate) => candidate.classList.remove("active"));
-  link.classList.add("active");
-}));
+const pageNames = {
+  market: "Visão de mercado",
+  items: "Meus anúncios",
+  performance: "Vendas e visitas",
+  analysis: "Margem e estoque"
+};
+function activatePage(name) {
+  const page = pageNames[name] ? name : "market";
+  document.querySelectorAll("[data-page-view]").forEach((view) => {
+    const active = view.dataset.pageView === page;
+    view.hidden = !active;
+    view.classList.toggle("active", active);
+  });
+  document.querySelectorAll(".side-link[data-page]").forEach((link) => {
+    const active = link.dataset.page === page;
+    link.classList.toggle("active", active);
+    if (active) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  });
+  const title = document.querySelector(".breadcrumb strong");
+  if (title) title.textContent = pageNames[page];
+  if ((page === "performance" || page === "analysis") && !accountPaging) {
+    const status = document.querySelector(page === "performance" ? "#performance-page-context" : "#analysis-page-context");
+    if (status) status.textContent = "Carregando seus anúncios para preparar esta página…";
+    loadAccountItems(0);
+  }
+}
+const pageFromHash = () => ({
+  "#visao-mercado": "market",
+  "#meus-anuncios": "items",
+  "#desempenho": "performance",
+  "#margem-estoque": "analysis"
+})[window.location.hash] || "market";
+window.addEventListener("hashchange", () => activatePage(pageFromHash()));
+activatePage(pageFromHash());
