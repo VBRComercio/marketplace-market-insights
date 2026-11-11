@@ -76,7 +76,7 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
       ads_percent: validPercent(body.ads_percent),
       defect_percent: validPercent(body.defect_percent),
       operational_percent: validPercent(body.operational_percent),
-      stock_alert_days: validPercent(body.stock_alert_days)
+      stock_alert_days: validRange(body.stock_alert_days, 0, 365)
     };
     if (Object.values(rates).some((value) => value === null)) return json({ error: "Informe percentuais entre 0 e 100." }, 400);
     await db.prepare(
@@ -164,6 +164,7 @@ function validDate(value) {
   const date = new Date(value + "T12:00:00-03:00");
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : null;
 }
+function validRange(value, minimum, maximum) { const number = Number(value); return value !== null && value !== undefined && value !== "" && Number.isFinite(number) && number >= minimum && number <= maximum ? number : null; }
 function validPercent(value) {
   const number = Number(value);
   return value !== null && value !== undefined && value !== "" && Number.isFinite(number) && number >= 0 && number <= 100 ? number : null;
