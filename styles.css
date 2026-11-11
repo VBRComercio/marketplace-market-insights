@@ -35,3 +35,18 @@
 .price-current{display:block;font-weight:700;color:#182230}.price-regular{display:block;margin-top:3px;color:#98a2b3;font-size:9px;text-decoration:line-through}.promo-label{display:inline-block;margin-top:4px;padding:3px 6px;border-radius:12px;background:#eaf8f1;color:#067647;font-size:8px;font-weight:700;letter-spacing:.4px}.price-unavailable{display:block;color:#b54708;font-size:9px;line-height:1.4}.account-status.warning{color:#b54708}
 
 .account-list-tools{display:flex;align-items:center;gap:9px;margin:0 0 10px;color:#667085;font-size:11px}.account-list-tools label{font-weight:600;color:#344054}.account-list-tools select{border:1px solid #d0d5dd;border-radius:6px;background:#fff;padding:7px 9px;color:#344054;font:11px "DM Sans",sans-serif}.account-list-tools span{font-size:10px;color:#98a2b3}@media(max-width:700px){.account-list-tools{align-items:flex-start;flex-direction:column;gap:6px}.account-list-tools select{width:100%}}
+
+.performance-panel{margin:18px 0 14px;padding:16px;border:1px solid #eaecf0;border-radius:9px;background:#fbfcfe}
+.performance-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.performance-heading h3{font:700 13px Manrope,sans-serif;margin:0;color:#344054}
+.performance-heading p{font-size:10px;color:#98a2b3;margin:4px 0 0}
+.performance-actions{display:flex;align-items:center;gap:8px}
+.performance-actions select,.performance-actions button{height:34px;border:1px solid #d0d5dd;border-radius:6px;background:#fff;padding:0 10px;color:#344054;font:600 10px "DM Sans",sans-serif}
+.performance-actions button{border:0;background:#7357f3;color:#fff;cursor:pointer}
+.performance-actions button:disabled{opacity:.6;cursor:wait}
+.performance-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:12px}
+.performance-summary article{padding:10px 12px;border:1px solid #eaecf0;border-radius:7px;background:#fff;min-width:0}
+.performance-summary article span{display:block;font-size:8px;letter-spacing:.5px;color:#667085;font-weight:700}
+.performance-summary article strong{display:block;margin-top:6px;font:700 16px Manrope,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-table{min-width:1040px}
+@media(max-width:700px){.performance-heading{align-items:flex-start;flex-direction:column}.performance-actions{width:100%}.performance-actions select{flex:1;min-width:0}.performance-actions button{white-space:nowrap}.performance-summary{grid-template-columns:1fr}.performance-summary article{display:flex;justify-content:space-between;align-items:center}.performance-summary article strong{margin:0}}
