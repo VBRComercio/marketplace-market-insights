@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS account_rate_history (
   ads_percent REAL NOT NULL,
   defect_percent REAL NOT NULL,
   operational_percent REAL NOT NULL,
+  stock_alert_days REAL NOT NULL DEFAULT 7,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (seller_id, effective_from)
 );
