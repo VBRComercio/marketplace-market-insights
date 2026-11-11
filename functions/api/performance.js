@@ -38,7 +38,8 @@ async function handleRequest(request, env) {
 
   const requestApi = async (target) => {
     const url = target.startsWith("http") ? target : API_BASE + target;
-    let response = await fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token } });
+    const tokenUsed = session.access_token;
+    let response = await fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + tokenUsed } });
     if (response.status === 401) {
       if (!refreshPromise && !refreshed) refreshPromise = refreshSession(session, env);
       const nextSession = refreshPromise ? await refreshPromise : null;
@@ -46,6 +47,8 @@ async function handleRequest(request, env) {
         session = nextSession;
         refreshed = true;
         refreshPromise = null;
+      }
+      if (session.access_token !== tokenUsed) {
         response = await fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token } });
       }
     }
@@ -73,7 +76,7 @@ async function handleRequest(request, env) {
   const visits = {};
   const visitDateRanges = [];
   const visitFailures = [];
-  const visitRequests = visitIds.map(async (itemId) => {
+  const loadVisit = async (itemId) => {
     const visitUrl = new URL(API_BASE + "/items/" + encodeURIComponent(itemId) + "/visits/time_window");
     visitUrl.searchParams.set("last", String(days));
     visitUrl.searchParams.set("unit", "day");
@@ -92,9 +95,11 @@ async function handleRequest(request, env) {
       visits[itemId] = null;
       visitFailures.push(0);
     }
-  });
+  };
+  for (let i = 0; i < visitIds.length; i += 10) {
+    await Promise.all(visitIds.slice(i, i + 10).map(loadVisit));
+  }
 
-  await Promise.all(visitRequests);
   if (visitDateRanges.length) {
     dateFrom = visitDateRanges[0].from;
     dateTo = visitDateRanges[0].to;
