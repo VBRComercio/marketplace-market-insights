@@ -2,6 +2,7 @@ import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.
 
 const API_BASE = "https://api.mercadolibre.com";
 const MAX_RESULTS = 50;
+const PRICE_LOOKUP_BATCH_SIZE = 10;
 
 export async function onRequestGet(context) {
   try {
@@ -32,19 +33,38 @@ async function handleSearch({ request, env }) {
     refreshed = true;
   }
 
-  const upstream = new URL(API_BASE + "/sites/MLB/search");
-  upstream.searchParams.set("q", query);
-  upstream.searchParams.set("limit", String(MAX_RESULTS));
-  upstream.searchParams.set("sort", "relevance");
-
-  try {
-    const response = await fetch(upstream, {
+  const authorizedFetch = async (target) => {
+    let response = await fetch(target, {
       headers: {
         Accept: "application/json",
         Authorization: "Bearer " + session.access_token,
         "User-Agent": "MarketplaceMarketInsights/1.0"
       }
     });
+    if (response.status === 401 && !refreshed) {
+      const nextSession = await refreshSession(session, env);
+      if (nextSession) {
+        session = nextSession;
+        refreshed = true;
+        response = await fetch(target, {
+          headers: {
+            Accept: "application/json",
+            Authorization: "Bearer " + session.access_token,
+            "User-Agent": "MarketplaceMarketInsights/1.0"
+          }
+        });
+      }
+    }
+    return response;
+  };
+
+  const upstream = new URL(API_BASE + "/sites/MLB/search");
+  upstream.searchParams.set("q", query);
+  upstream.searchParams.set("limit", String(MAX_RESULTS));
+  upstream.searchParams.set("sort", "relevance");
+
+  try {
+    const response = await authorizedFetch(upstream);
     const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
     if (response.status === 401) {
       return json({ error: "O Mercado Livre rejeitou a autorização. Atualize a conexão da conta e tente novamente.", login_url: "/auth/login" }, 401, { ...headers, "Set-Cookie": clearSessionCookie() });
@@ -63,20 +83,38 @@ async function handleSearch({ request, env }) {
     }
 
     const raw = await response.json();
-    const results = (Array.isArray(raw.results) ? raw.results : []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      price: item.price,
-      currency_id: item.currency_id,
-      condition: item.condition,
-      thumbnail: item.thumbnail,
-      permalink: item.permalink,
-      seller: item.seller ? { id: item.seller.id } : null,
-      category_id: item.category_id
-    }));
+    const rawItems = Array.isArray(raw.results) ? raw.results : [];
+    const results = [];
+    for (let i = 0; i < rawItems.length; i += PRICE_LOOKUP_BATCH_SIZE) {
+      const group = rawItems.slice(i, i + PRICE_LOOKUP_BATCH_SIZE);
+      const pricedGroup = await Promise.all(group.map(async (item) => {
+        const sale = item.id ? await fetchSalePrice(item.id, authorizedFetch) : null;
+        const saleAmount = finiteAmount(sale?.amount);
+        const regularAmount = finiteAmount(sale?.regular_amount) ?? finiteAmount(item.original_price);
+        const currentAmount = saleAmount;
+        return {
+          id: item.id,
+          title: item.title,
+          price: currentAmount,
+          regular_price: regularAmount,
+          is_promotional: currentAmount !== null && regularAmount !== null && regularAmount > currentAmount,
+          price_source: saleAmount === null ? "unavailable" : "sale_price",
+          currency_id: sale?.currency_id || item.currency_id,
+          condition: item.condition,
+          thumbnail: item.thumbnail,
+          permalink: item.permalink,
+          seller: item.seller ? { id: item.seller.id } : null,
+          category_id: item.category_id
+        };
+      }));
+      results.push(...pricedGroup);
+    }
+
+    if (refreshed) headers["Set-Cookie"] = await sessionCookie(session, env);
     return json({
       query,
       site: "MLB",
+      pricing_context: "channel_marketplace",
       paging: { total: raw.paging?.total ?? results.length, limit: MAX_RESULTS },
       results
     }, 200, headers);
@@ -84,6 +122,23 @@ async function handleSearch({ request, env }) {
     const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
     return json({ error: "Não foi possível conectar à API do Mercado Livre. Tente novamente." }, 502, headers);
   }
+}
+
+async function fetchSalePrice(itemId, authorizedFetch) {
+  try {
+    const url = new URL(API_BASE + "/items/" + encodeURIComponent(itemId) + "/sale_price");
+    url.searchParams.set("context", "channel_marketplace");
+    const response = await authorizedFetch(url);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function finiteAmount(value) {
+  const amount = Number(value);
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(amount) ? amount : null;
 }
 
 function describeApiError(payload) {

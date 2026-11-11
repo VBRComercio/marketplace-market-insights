@@ -3,6 +3,7 @@ import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.
 const API_BASE = "https://api.mercadolibre.com";
 const PAGE_SIZE = 50;
 const BULK_SIZE = 20;
+const PRICE_LOOKUP_BATCH_SIZE = 10;
 
 export async function onRequestGet({ request, env }) {
   try {
@@ -97,7 +98,11 @@ async function handleRequest(request, env) {
         byId.set(item.id, {
           id: item.id,
           title: item.title || "Anúncio sem título",
-          price: item.price ?? null,
+          standard_price: item.price ?? null,
+          price: null,
+          regular_price: null,
+          is_promotional: false,
+          price_source: "unavailable",
           currency_id: item.currency_id || "BRL",
           status: item.status || "active",
           available_quantity: item.available_quantity ?? null,
@@ -112,10 +117,48 @@ async function handleRequest(request, env) {
     }
   }
 
+  const itemDetails = ids.map((id) => byId.get(id)).filter(Boolean);
+  let pricingUnavailable = 0;
+  const pricedItems = [];
+  for (let i = 0; i < itemDetails.length; i += PRICE_LOOKUP_BATCH_SIZE) {
+    const group = itemDetails.slice(i, i + PRICE_LOOKUP_BATCH_SIZE);
+    const prices = await Promise.all(group.map(async (item) => {
+      const priceUrl = "/items/" + encodeURIComponent(item.id) + "/sale_price?context=channel_marketplace";
+      try {
+        const response = await requestApi(priceUrl);
+        if (!response.ok) {
+          pricingUnavailable += 1;
+          return item;
+        }
+        const sale = await response.json();
+        const amount = finiteAmount(sale.amount);
+        if (amount === null) {
+          pricingUnavailable += 1;
+          return item;
+        }
+        const regularAmount = finiteAmount(sale.regular_amount);
+        return {
+          ...item,
+          price: amount,
+          regular_price: regularAmount,
+          is_promotional: regularAmount !== null && regularAmount > amount,
+          price_source: "sale_price",
+          currency_id: sale.currency_id || item.currency_id
+        };
+      } catch {
+        pricingUnavailable += 1;
+        return item;
+      }
+    }));
+    pricedItems.push(...prices);
+  }
+
   const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
   return json({
     seller: { id: me.id, nickname: me.nickname || null },
-    items: ids.map((id) => byId.get(id)).filter(Boolean),
+    pricing_context: "channel_marketplace",
+    pricing_unavailable_count: pricingUnavailable,
+    items: pricedItems,
     paging: {
       total: search.paging?.total ?? ids.length,
       limit: PAGE_SIZE,
@@ -124,6 +167,11 @@ async function handleRequest(request, env) {
       scan_required: Number(search.paging?.total || 0) > 1000
     }
   }, 200, headers);
+}
+
+function finiteAmount(value) {
+  const amount = Number(value);
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(amount) ? amount : null;
 }
 
 async function refreshSession(session, env) {
