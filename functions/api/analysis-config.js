@@ -41,13 +41,13 @@ async function getConfig(request, db, sellerId, nickname, session, env, refreshe
     mappings = result.results || [];
   }
   const costs = await db.prepare(
-    "SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity FROM (SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity, ROW_NUMBER() OVER (PARTITION BY sku ORDER BY effective_from DESC, id DESC) AS row_number FROM sku_cost_history WHERE seller_id = ? AND effective_from <= ?) WHERE row_number = 1"
+    "SELECT sku, lot_code, effective_from, unit_cost, packaging_cost FROM (SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, ROW_NUMBER() OVER (PARTITION BY sku ORDER BY effective_from DESC, id DESC) AS row_number FROM sku_cost_history WHERE seller_id = ? AND effective_from <= ?) WHERE row_number = 1"
   ).bind(String(sellerId), today).all();
   const ratesHistory = await db.prepare(
     "SELECT effective_from, nf_percent, ads_percent, defect_percent, operational_percent, stock_alert_days FROM account_rate_history WHERE seller_id = ? ORDER BY effective_from DESC, id DESC LIMIT 100"
   ).bind(String(sellerId)).all();
   const costsHistory = await db.prepare(
-    "SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity FROM sku_cost_history WHERE seller_id = ? ORDER BY effective_from DESC, id DESC LIMIT 250"
+    "SELECT sku, lot_code, effective_from, unit_cost, packaging_cost FROM sku_cost_history WHERE seller_id = ? ORDER BY effective_from DESC, id DESC LIMIT 250"
   ).bind(String(sellerId)).all();
   const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
   return json({
@@ -92,8 +92,7 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
     const lotCode = typeof body.lot_code === "string" ? body.lot_code.trim().slice(0, 100) : "";
     const unitCost = validMoney(body.unit_cost);
     const packagingCost = validMoney(body.packaging_cost);
-    const lotQuantity = body.lot_quantity === "" || body.lot_quantity === null || body.lot_quantity === undefined ? null : validQuantity(body.lot_quantity);
-    if (!itemId || !sku || !lotCode || unitCost === null || packagingCost === null || (lotQuantity !== null && lotQuantity === false)) {
+        if (!itemId || !sku || !lotCode || unitCost === null || packagingCost === null) {
       return json({ error: "Preencha anúncio, SKU, lote, custo do produto e embalagem com valores válidos." }, 400);
     }
     await db.batch([
@@ -101,8 +100,8 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
         "INSERT INTO listing_sku_map (seller_id, item_id, sku) VALUES (?, ?, ?) ON CONFLICT(seller_id, item_id) DO UPDATE SET sku = excluded.sku, updated_at = CURRENT_TIMESTAMP"
       ).bind(String(sellerId), itemId, sku),
       db.prepare(
-        "INSERT INTO sku_cost_history (seller_id, sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(seller_id, sku, lot_code, effective_from) DO UPDATE SET unit_cost = excluded.unit_cost, packaging_cost = excluded.packaging_cost, lot_quantity = excluded.lot_quantity"
-      ).bind(String(sellerId), sku, lotCode, effectiveFrom, unitCost, packagingCost, lotQuantity)
+        "INSERT INTO sku_cost_history (seller_id, sku, lot_code, effective_from, unit_cost, packaging_cost) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(seller_id, sku, lot_code, effective_from) DO UPDATE SET unit_cost = excluded.unit_cost, packaging_cost = excluded.packaging_cost = excluded.lot_quantity"
+      ).bind(String(sellerId), sku, lotCode, effectiveFrom, unitCost, packagingCost)
     ]);
     const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
     return json({ saved: true, type: "sku_cost", item_id: itemId, sku, lot_code: lotCode, effective_from: effectiveFrom }, 200, headers);
