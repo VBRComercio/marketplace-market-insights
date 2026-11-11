@@ -92,7 +92,7 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
     const lotCode = typeof body.lot_code === "string" ? body.lot_code.trim().slice(0, 100) : "";
     const unitCost = validMoney(body.unit_cost);
     const packagingCost = validMoney(body.packaging_cost);
-        if (!itemId || !sku || !lotCode || unitCost === null || packagingCost === null) {
+    if (!itemId || !sku || !lotCode || unitCost === null || packagingCost === null) {
       return json({ error: "Preencha anúncio, SKU, lote, custo do produto e embalagem com valores válidos." }, 400);
     }
     await db.batch([
@@ -100,7 +100,7 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
         "INSERT INTO listing_sku_map (seller_id, item_id, sku) VALUES (?, ?, ?) ON CONFLICT(seller_id, item_id) DO UPDATE SET sku = excluded.sku, updated_at = CURRENT_TIMESTAMP"
       ).bind(String(sellerId), itemId, sku),
       db.prepare(
-        "INSERT INTO sku_cost_history (seller_id, sku, lot_code, effective_from, unit_cost, packaging_cost) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(seller_id, sku, lot_code, effective_from) DO UPDATE SET unit_cost = excluded.unit_cost, packaging_cost = excluded.packaging_cost = excluded.lot_quantity"
+        "INSERT INTO sku_cost_history (seller_id, sku, lot_code, effective_from, unit_cost, packaging_cost) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(seller_id, sku, lot_code, effective_from) DO UPDATE SET unit_cost = excluded.unit_cost, packaging_cost = excluded.packaging_cost"
       ).bind(String(sellerId), sku, lotCode, effectiveFrom, unitCost, packagingCost)
     ]);
     const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
