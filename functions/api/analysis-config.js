@@ -43,13 +43,21 @@ async function getConfig(request, db, sellerId, nickname, session, env, refreshe
   const costs = await db.prepare(
     "SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity FROM (SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity, ROW_NUMBER() OVER (PARTITION BY sku ORDER BY effective_from DESC, id DESC) AS row_number FROM sku_cost_history WHERE seller_id = ? AND effective_from <= ?) WHERE row_number = 1"
   ).bind(String(sellerId), today).all();
+  const ratesHistory = await db.prepare(
+    "SELECT effective_from, nf_percent, ads_percent, defect_percent, operational_percent FROM account_rate_history WHERE seller_id = ? ORDER BY effective_from DESC, id DESC LIMIT 100"
+  ).bind(String(sellerId)).all();
+  const costsHistory = await db.prepare(
+    "SELECT sku, lot_code, effective_from, unit_cost, packaging_cost, lot_quantity FROM sku_cost_history WHERE seller_id = ? ORDER BY effective_from DESC, id DESC LIMIT 250"
+  ).bind(String(sellerId)).all();
   const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
   return json({
     seller: { id: sellerId, nickname: nickname || null },
     rates: ratesResult || { ...DEFAULT_RATES, effective_from: null },
     rates_configured: Boolean(ratesResult),
     mappings,
-    latest_costs: costs.results || []
+    latest_costs: costs.results || [],
+    rates_history: ratesHistory.results || [],
+    costs_history: costsHistory.results || []
   }, 200, headers);
 }
 
