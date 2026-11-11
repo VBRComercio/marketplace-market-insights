@@ -60,10 +60,26 @@
             <article><span>ITENS NESTA PÁGINA</span><strong id="page-total">—</strong></article>
             <article><span>ESTOQUE NESTA PÁGINA</span><strong id="stock-total">—</strong></article>
           </div>
+          <div class="performance-panel">
+            <div class="performance-heading">
+              <div><h3 id="performance-heading">Vendas e visitas</h3><p>Métricas por anúncio no período escolhido.</p></div>
+              <div class="performance-actions">
+                <label class="sr-only" for="performance-days">Período das métricas</label>
+                <select id="performance-days"><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option></select>
+                <button type="button" id="load-performance">Consultar desempenho</button>
+              </div>
+            </div>
+            <div id="performance-status" class="account-status" role="status" aria-live="polite">Carregue os anúncios e escolha um período para consultar vendas e visitas.</div>
+            <div id="performance-summary" class="performance-summary" hidden>
+              <article><span>VISITAS NO PERÍODO</span><strong id="period-visits">—</strong></article>
+              <article><span>UNIDADES EM PEDIDOS PAGOS</span><strong id="period-units">—</strong></article>
+              <article><span>FATURAMENTO BRUTO</span><strong id="period-gross">—</strong></article>
+            </div>
+          </div>
           <div class="account-list-tools"><label for="account-sort">Ordenar anúncios</label><select id="account-sort"><option value="title">Nome: A–Z</option><option value="price-asc">Preço de venda: menor primeiro</option><option value="price-desc">Preço de venda: maior primeiro</option><option value="stock-desc">Estoque: maior primeiro</option><option value="stock-asc">Estoque: menor primeiro</option></select><span>Ordena os anúncios desta página.</span></div>
           <div class="account-table-wrap">
             <table class="account-table">
-              <thead><tr><th>ANÚNCIO</th><th>PREÇO DE VENDA</th><th>ESTOQUE</th><th>PUBLICAÇÃO</th><th></th></tr></thead>
+              <thead><tr><th>ANÚNCIO</th><th>PREÇO DE VENDA</th><th>ESTOQUE</th><th>PUBLICAÇÃO</th><th>VISITAS</th><th>UNIDADES VENDIDAS</th><th>FATURAMENTO BRUTO</th><th></th></tr></thead>
               <tbody id="account-rows"></tbody>
             </table>
           </div>
