@@ -33,8 +33,8 @@ async function handleSearch({ request, env }) {
     refreshed = true;
   }
 
-  const authorizedFetch = async (url) => {
-    let response = await fetch(url, {
+  const authorizedFetch = async (target) => {
+    let response = await fetch(target, {
       headers: {
         Accept: "application/json",
         Authorization: "Bearer " + session.access_token,
@@ -46,7 +46,7 @@ async function handleSearch({ request, env }) {
       if (nextSession) {
         session = nextSession;
         refreshed = true;
-        response = await fetch(url, {
+        response = await fetch(target, {
           headers: {
             Accept: "application/json",
             Authorization: "Bearer " + session.access_token,
@@ -110,7 +110,7 @@ async function handleSearch({ request, env }) {
       results.push(...pricedGroup);
     }
 
-    const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
+    if (refreshed) headers["Set-Cookie"] = await sessionCookie(session, env);
     return json({
       query,
       site: "MLB",
