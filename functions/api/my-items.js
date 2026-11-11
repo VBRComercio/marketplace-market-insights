@@ -108,6 +108,12 @@ async function handleRequest(request, env) {
           available_quantity: item.available_quantity ?? null,
           condition: item.condition || null,
           listing_type_id: item.listing_type_id || null,
+          seller_sku: item.seller_custom_field || item.attributes?.find((attribute) => attribute.id === "SELLER_SKU")?.value_name || null,
+          shipping: {
+            mode: item.shipping?.mode || null,
+            logistic_type: item.shipping?.logistic_type || null,
+            free_shipping: Boolean(item.shipping?.free_shipping)
+          },
           thumbnail: item.thumbnail || null,
           permalink: item.permalink || null,
           category_id: item.category_id || null,
