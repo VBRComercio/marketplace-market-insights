@@ -39,3 +39,10 @@ Para desenvolvimento local, instale Wrangler e execute `wrangler pages dev .`. A
 ## Segurança
 
 As chamadas à API são feitas no servidor com o access token. Access token e refresh token ficam em cookie criptografado `HttpOnly`, inacessível ao JavaScript do navegador. O Client Secret não deve ser publicado. O projeto não altera anúncios nem dados da conta.
+
+
+## Cadastro de custos e parâmetros de margem
+
+A funcionalidade de cadastro usa um banco Cloudflare D1. Crie um banco D1 e associe-o às Pages Functions com o binding `DB`. Aplique `migrations/0001_analysis.sql` ao banco antes de habilitar o cadastro. O código reconhece a ausência do binding/migração e informa o problema sem interromper as páginas existentes.
+
+Os registros são isolados pelo ID da conta autenticada no Mercado Livre. A tabela de percentuais guarda uma vigência global por conta (incluindo NF do CNPJ). Custos e embalagens são mantidos por SKU, lote e data de início; a associação entre SKU e anúncio também é armazenada. As rotas exigem sessão OAuth e não expõem o token no navegador.
