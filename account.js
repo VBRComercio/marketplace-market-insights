@@ -477,6 +477,7 @@ function renderMarginTable() {
     const details = analysis ? '<small>SKU ' + accountEsc(analysis.sku || "não vinculado") + '</small>' : '<small>Atualize a análise</small>';
     return '<tr><td><strong>' + accountEsc(item.title) + '</strong><small>' + accountEsc(item.id) + '</small>' + details + missingTitle + '</td>' +
       '<td>' + formatValue(payout) + '</td><td>' + formatValue(analysis?.sale_fee) + '</td><td>' + formatValue(analysis?.seller_shipping) + '</td>' +
+      '<td>' + (analysis?.unit_cost === null || analysis?.unit_cost === undefined ? "N/D" : formatValue(Number(analysis.unit_cost) + Number(analysis.packaging_cost || 0))) + '</td>' +
       '<td>' + formatValue(estimated) + '</td><td>' + (quantity === null ? "N/D" : new Intl.NumberFormat("pt-BR").format(quantity)) + '</td>' +
       '<td class="' + coverageClass + '">' + accountEsc(coverage) + '</td><td>' + formatValue(stockValue) + '</td></tr>';
   });
@@ -492,6 +493,15 @@ function renderMarginTable() {
   analysisTotalPayout.textContent = completePayout ? formatValue(accountItems.reduce((sum, item) => sum + Number(marginByItem.get(item.id).contribution_margin), 0)) : "Dados parciais";
   analysisTotalMargin.textContent = completeMargin ? formatValue(accountItems.reduce((sum, item) => sum + Number(marginByItem.get(item.id).estimated_margin), 0)) : "Dados parciais";
   analysisStockValue.textContent = marginByItem.size ? formatValue(knownStock) + (completeStock ? "" : " · parcial") : "—";
+  const lowStockCount = accountItems.filter((item) => {
+    const metrics = performanceByItem.get(item.id);
+    const qty = Number(item.available_quantity);
+    const soldUnits = metrics?.units_sold;
+    const daily = soldUnits === null || soldUnits === undefined ? null : Number(soldUnits) / (Number(performanceDays?.value) || 30);
+    return daily > 0 && Number.isFinite(qty) && qty / daily <= Number(analysisConfig?.rates?.stock_alert_days ?? 7);
+  }).length;
+  const lowStockElement = document.querySelector("#analysis-low-stock-count");
+  if (lowStockElement) lowStockElement.textContent = performanceByItem.size ? String(lowStockCount) : "Consulte desempenho";
   analysisSummary.hidden = false;
 }
 
