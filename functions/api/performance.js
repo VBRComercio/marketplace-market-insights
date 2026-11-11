@@ -71,6 +71,7 @@ async function handleRequest(request, env) {
   let dateTo = new Date().toISOString();
 
   const visits = {};
+  const visitDateRanges = [];
   const visitFailures = [];
   const visitRequests = visitIds.map(async (itemId) => {
     const visitUrl = new URL(API_BASE + "/items/" + encodeURIComponent(itemId) + "/visits/time_window");
@@ -86,19 +87,23 @@ async function handleRequest(request, env) {
       }
       const payload = await response.json();
       visits[itemId] = finiteAmount(payload.total_visits);
-      if (payload.date_from) dateFrom = payload.date_from;
-      if (payload.date_to) dateTo = payload.date_to;
+      if (payload.date_from && payload.date_to) visitDateRanges.push({ from: payload.date_from, to: payload.date_to });
     } catch {
       visits[itemId] = null;
       visitFailures.push(0);
     }
   });
 
+  if (visitDateRanges.length) {
+    dateFrom = visitDateRanges[0].from;
+    dateTo = visitDateRanges[0].to;
+  }
+
   const ordersUrl = new URL(API_BASE + "/orders/search");
   const isoStartFallback = new Date(Date.now() - days * 86_400_000).toISOString();
   ordersUrl.searchParams.set("seller", String(me.id));
   ordersUrl.searchParams.set("order.status", "paid");
-  ordersUrl.searchParams.set("order.date_created.from", isoStartFallback);
+  ordersUrl.searchParams.set("order.date_created.from", dateFrom || isoStartFallback);
   ordersUrl.searchParams.set("order.date_created.to", dateTo);
   ordersUrl.searchParams.set("sort", "date_desc");
   ordersUrl.searchParams.set("limit", String(ORDER_PAGE_SIZE));
@@ -146,7 +151,7 @@ async function handleRequest(request, env) {
   await Promise.all(visitRequests);
   const items = itemIds.map((id) => {
     const sales = salesByItem[id] || { units: 0, gross: 0 };
-    return { id, visits: visits[id] ?? null, units_sold: sales.units, gross_sales: Math.round(sales.gross * 100) / 100 };
+    return { id, visits: visits[id] ?? null, units_sold: salesError ? null : sales.units, gross_sales: salesError ? null : Math.round(sales.gross * 100) / 100 };
   });
   const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
   return json({
@@ -157,8 +162,8 @@ async function handleRequest(request, env) {
     items,
     totals: {
       visits: items.reduce((sum, item) => sum + (item.visits ?? 0), 0),
-      units_sold: items.reduce((sum, item) => sum + item.units_sold, 0),
-      gross_sales: Math.round(items.reduce((sum, item) => sum + item.gross_sales, 0) * 100) / 100
+      units_sold: salesError ? null : items.reduce((sum, item) => sum + (item.units_sold || 0), 0),
+      gross_sales: salesError ? null : Math.round(items.reduce((sum, item) => sum + (item.gross_sales || 0), 0) * 100) / 100
     },
     orders: { scanned: ordersScanned, total: ordersTotal, partial: ordersPartial },
     visits_partial: itemIds.length > visitIds.length || visitFailures.length > 0,
