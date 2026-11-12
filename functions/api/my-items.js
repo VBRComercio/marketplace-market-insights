@@ -3,7 +3,7 @@ import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.
 const API_BASE = "https://api.mercadolibre.com";
 const PAGE_SIZE = 50;
 const BULK_SIZE = 20;
-const PRICE_LOOKUP_BATCH_SIZE = 5;
+const PRICE_LOOKUP_BATCH_SIZE = 10;
 
 export async function onRequestGet({ request, env }) {
   try {
@@ -16,8 +16,13 @@ export async function onRequestGet({ request, env }) {
 async function handleRequest(request, env) {
   const url = new URL(request.url);
   const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+  const priceOffset = Number.parseInt(url.searchParams.get("price_offset") || "0", 10);
   if (!Number.isInteger(offset) || offset < 0 || offset > 950 || offset % PAGE_SIZE !== 0) {
     return json({ error: "Página inválida. Use um deslocamento em incrementos de 50." }, 400);
+  }
+
+  if (!Number.isInteger(priceOffset) || priceOffset < 0 || priceOffset > 40 || priceOffset % PRICE_LOOKUP_BATCH_SIZE !== 0) {
+    return json({ error: "Lote de preços inválido." }, 400);
   }
 
   let session = await readSession(request, env);
@@ -140,8 +145,9 @@ async function handleRequest(request, env) {
     pricingUnavailableStatuses[reason] = (pricingUnavailableStatuses[reason] || 0) + 1;
   };
   const pricedItems = [];
-  for (let i = 0; i < itemDetails.length; i += PRICE_LOOKUP_BATCH_SIZE) {
-    const group = itemDetails.slice(i, i + PRICE_LOOKUP_BATCH_SIZE);
+  const selectedDetails = itemDetails.slice(priceOffset, priceOffset + PRICE_LOOKUP_BATCH_SIZE);
+  for (let i = 0; i < selectedDetails.length; i += PRICE_LOOKUP_BATCH_SIZE) {
+    const group = selectedDetails.slice(i, i + PRICE_LOOKUP_BATCH_SIZE);
     const prices = await Promise.all(group.map(async (item) => {
       const priceUrl = "/items/" + encodeURIComponent(item.id) + "/sale_price?context=channel_marketplace";
       try {
@@ -173,13 +179,16 @@ async function handleRequest(request, env) {
     pricedItems.push(...prices);
   }
 
+  const pricedById = new Map(pricedItems.map((item) => [item.id, item]));
+  const resultItems = itemDetails.map((item) => pricedById.get(item.id) || item);
   const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
   return json({
     seller: { id: me.id, nickname: me.nickname || null },
     pricing_context: "channel_marketplace",
     pricing_unavailable_count: pricingUnavailable,
     pricing_unavailable_statuses: pricingUnavailableStatuses,
-    items: pricedItems,
+    price_offset: priceOffset,
+    items: resultItems,
     paging: {
       total: search.paging?.total ?? ids.length,
       limit: PAGE_SIZE,
