@@ -101,7 +101,11 @@ async function loadAccountItems(offset = 0) {
     await loadAnalysisConfig();
     const seller = data.seller?.nickname ? "Conta " + data.seller.nickname + " · " : "";
     const missingPrices = Number(data.pricing_unavailable_count || 0);
-    setAccountStatus(seller + (missingPrices ? missingPrices + " preço(s) vigente(s) não retornado(s) pela API." : "Preços de venda atuais consultados no canal Mercado Livre."), missingPrices ? "warning" : "success");
+    const pricingDetails = Object.entries(data.pricing_unavailable_statuses || {}).map(([reason, count]) => reason + ": " + count).join(", ");
+    const priceWarning = missingPrices
+      ? missingPrices + " preço(s) vigente(s) não retornado(s) pela API" + (pricingDetails ? " (" + pricingDetails + ")." : ".")
+      : "Preços de venda atuais consultados no canal Mercado Livre.";
+    setAccountStatus(seller + priceWarning, missingPrices ? "warning" : "success");
   } catch {
     setAccountStatus("Falha de conexão ao carregar seus anúncios. Tente novamente.", "error");
   } finally {
@@ -301,7 +305,7 @@ async function loadPerformance() {
       }
       const continuation = await continuationResponse.json();
       if (!continuationResponse.ok) {
-        ordersWarning = continuation?.error || "Não foi possível completar a consulta de pedidos.";
+        ordersWarning = (continuation?.error || "Não foi possível completar a consulta de pedidos.") + (continuation?.request_id ? " · ID: " + continuation.request_id : "");
         break;
       }
       for (const [itemId, sales] of Object.entries(continuation.sales_by_item || {})) {

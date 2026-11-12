@@ -3,7 +3,7 @@ import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.
 const API_BASE = "https://api.mercadolibre.com";
 const PAGE_SIZE = 50;
 const BULK_SIZE = 20;
-const PRICE_LOOKUP_BATCH_SIZE = 10;
+const PRICE_LOOKUP_BATCH_SIZE = 5;
 
 export async function onRequestGet({ request, env }) {
   try {
@@ -35,20 +35,29 @@ async function handleRequest(request, env) {
   }
 
   const requestApi = async (path) => {
-    let response = await fetch(API_BASE + path, {
-      headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token }
-    });
-    if (response.status === 401 && !refreshed) {
-      const nextSession = await refreshSession(session, env);
-      if (nextSession) {
-        session = nextSession;
-        refreshed = true;
-        response = await fetch(API_BASE + path, {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        let response = await fetch(API_BASE + path, {
           headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token }
         });
+        if (response.status === 401 && !refreshed) {
+          const nextSession = await refreshSession(session, env);
+          if (nextSession) {
+            session = nextSession;
+            refreshed = true;
+            response = await fetch(API_BASE + path, {
+              headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token }
+            });
+          }
+        }
+        if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) return response;
+        await waitBeforeRetry(response, attempt);
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await waitBeforeRetry(null, attempt);
       }
     }
-    return response;
+    throw new Error("A API não respondeu após novas tentativas.");
   };
 
   const meResponse = await requestApi("/users/me");
@@ -125,6 +134,11 @@ async function handleRequest(request, env) {
 
   const itemDetails = ids.map((id) => byId.get(id)).filter(Boolean);
   let pricingUnavailable = 0;
+  const pricingUnavailableStatuses = {};
+  const recordPricingFailure = (reason) => {
+    pricingUnavailable += 1;
+    pricingUnavailableStatuses[reason] = (pricingUnavailableStatuses[reason] || 0) + 1;
+  };
   const pricedItems = [];
   for (let i = 0; i < itemDetails.length; i += PRICE_LOOKUP_BATCH_SIZE) {
     const group = itemDetails.slice(i, i + PRICE_LOOKUP_BATCH_SIZE);
@@ -133,13 +147,13 @@ async function handleRequest(request, env) {
       try {
         const response = await requestApi(priceUrl);
         if (!response.ok) {
-          pricingUnavailable += 1;
+          recordPricingFailure("HTTP " + response.status);
           return item;
         }
         const sale = await response.json();
         const amount = finiteAmount(sale.amount);
         if (amount === null) {
-          pricingUnavailable += 1;
+          recordPricingFailure("resposta sem preço");
           return item;
         }
         const regularAmount = finiteAmount(sale.regular_amount);
@@ -152,7 +166,7 @@ async function handleRequest(request, env) {
           currency_id: sale.currency_id || item.currency_id
         };
       } catch {
-        pricingUnavailable += 1;
+        recordPricingFailure("conexão");
         return item;
       }
     }));
@@ -164,6 +178,7 @@ async function handleRequest(request, env) {
     seller: { id: me.id, nickname: me.nickname || null },
     pricing_context: "channel_marketplace",
     pricing_unavailable_count: pricingUnavailable,
+    pricing_unavailable_statuses: pricingUnavailableStatuses,
     items: pricedItems,
     paging: {
       total: search.paging?.total ?? ids.length,
@@ -175,6 +190,11 @@ async function handleRequest(request, env) {
   }, 200, headers);
 }
 
+async function waitBeforeRetry(response, attempt) {
+  const retryAfter = Number(response?.headers?.get("retry-after"));
+  const delay = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(2000, retryAfter * 1000) : (attempt === 0 ? 300 : 800);
+  await new Promise((resolve) => setTimeout(resolve, delay));
+}
 function finiteAmount(value) {
   const amount = Number(value);
   return value !== null && value !== undefined && value !== "" && Number.isFinite(amount) ? amount : null;
