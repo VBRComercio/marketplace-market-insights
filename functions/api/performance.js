@@ -47,22 +47,31 @@ async function handleRequest(request, env) {
   }
 
   const requestApi = async (target) => {
-    const url = target.startsWith("http") ? target : API_BASE + target;
-    const tokenUsed = session.access_token;
-    let response = await fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + tokenUsed } });
-    if (response.status === 401) {
-      if (!refreshPromise && !refreshed) refreshPromise = refreshSession(session, env);
-      const nextSession = refreshPromise ? await refreshPromise : null;
-      if (nextSession) {
-        session = nextSession;
-        refreshed = true;
-        refreshPromise = null;
-      }
-      if (session.access_token !== tokenUsed) {
-        response = await fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token } });
+    const apiUrl = target.startsWith("http") ? target : API_BASE + target;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const tokenUsed = session.access_token;
+        let response = await fetch(apiUrl, { headers: { Accept: "application/json", Authorization: "Bearer " + tokenUsed } });
+        if (response.status === 401) {
+          if (!refreshPromise && !refreshed) refreshPromise = refreshSession(session, env);
+          const nextSession = refreshPromise ? await refreshPromise : null;
+          if (nextSession) {
+            session = nextSession;
+            refreshed = true;
+            refreshPromise = null;
+          }
+          if (session.access_token !== tokenUsed) {
+            response = await fetch(apiUrl, { headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token } });
+          }
+        }
+        if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) return response;
+        await waitBeforeRetry(response, attempt);
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await waitBeforeRetry(null, attempt);
       }
     }
-    return response;
+    throw new Error("A API não respondeu após novas tentativas.");
   };
 
   const meResponse = await requestApi("/users/me");
@@ -115,8 +124,8 @@ async function handleRequest(request, env) {
       visitFailures.push(0);
     }
   };
-  for (let i = 0; i < visitIds.length; i += 10) {
-    await Promise.all(visitIds.slice(i, i + 10).map(loadVisit));
+  for (let i = 0; i < visitIds.length; i += 5) {
+    await Promise.all(visitIds.slice(i, i + 5).map(loadVisit));
   }
 
   if (visitDateRanges.length && !customPeriod) {
@@ -145,7 +154,9 @@ async function handleRequest(request, env) {
       const response = await requestApi(ordersUrl.pathname + ordersUrl.search);
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        salesError = safeApiMessage(payload) || "A API não autorizou a consulta de pedidos.";
+        const detail = safeApiMessage(payload) || "A API não autorizou a consulta de pedidos.";
+        const requestId = response.headers.get("x-request-id");
+        salesError = detail + " (HTTP " + response.status + ")" + (requestId ? " · ID: " + requestId : "");
         break;
       }
       const payload = await response.json();
@@ -169,9 +180,10 @@ async function handleRequest(request, env) {
     }
     if (ordersTotal !== null && ordersScanned < ordersTotal) ordersPartial = true;
   } catch {
-    salesError = "Não foi possível consultar pedidos agora.";
+    salesError = "A conexão com a API de pedidos falhou após novas tentativas.";
   }
 
+  const visitFailureSummary = Object.entries(visitFailures.reduce((counts, status) => { const label = status ? "HTTP " + status : "conexão"; counts[label] = (counts[label] || 0) + 1; return counts; }, {})).map(([label, count]) => label + ": " + count).join(", ");
   const items = itemIds.map((id) => {
     const sales = salesByItem[id] || { units: 0, gross: 0 };
     return { id, visits: visits[id] ?? null, units_sold: salesError ? null : sales.units, gross_sales: salesError ? null : Math.round(sales.gross * 100) / 100 };
@@ -192,10 +204,15 @@ async function handleRequest(request, env) {
     visits_partial: itemIds.length > visitIds.length || visitFailures.length > 0,
     visits_unavailable_count: itemIds.length - Object.values(visits).filter((value) => value !== null).length,
     sales_error: salesError,
-    visits_error: visitFailures.length ? "A API não retornou visitas para " + visitFailures.length + " anúncio(s)." : null
+    visits_error: visitFailures.length ? "A consulta falhou para " + visitFailures.length + " anúncio(s) (" + visitFailureSummary + ")." : null
   }, 200, headers);
 }
 
+async function waitBeforeRetry(response, attempt) {
+  const retryAfter = Number(response?.headers?.get("retry-after"));
+  const delay = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(2000, retryAfter * 1000) : (attempt === 0 ? 300 : 800);
+  await new Promise((resolve) => setTimeout(resolve, delay));
+}
 function parseDateOnly(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const parsed = Date.parse(value + "T00:00:00.000Z");
