@@ -393,8 +393,13 @@ async function loadPerformance() {
 
     if (!data.sales_error) {
       data.orders = { ...(data.orders || {}), scanned: processedOrders, total: ordersTotal, partial: nextOrderOffset !== null && nextOrderOffset !== undefined, next_offset: nextOrderOffset };
-      data.totals.units_sold = [...performanceByItem.values()].reduce((sum, item) => sum + (Number(item.units_sold) || 0), 0);
-      data.totals.gross_sales = Math.round([...performanceByItem.values()].reduce((sum, item) => sum + (Number(item.gross_sales) || 0), 0) * 100) / 100;
+      if (ordersWarning && processedOrders === 0) {
+        data.totals.units_sold = null;
+        data.totals.gross_sales = null;
+      } else {
+        data.totals.units_sold = [...performanceByItem.values()].reduce((sum, item) => sum + (Number(item.units_sold) || 0), 0);
+        data.totals.gross_sales = Math.round([...performanceByItem.values()].reduce((sum, item) => sum + (Number(item.gross_sales) || 0), 0) * 100) / 100;
+      }
     }
     renderAccountItems({ items: accountItems, paging: accountPaging });
     renderPerformanceRows();
