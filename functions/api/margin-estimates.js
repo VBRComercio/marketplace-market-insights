@@ -58,21 +58,43 @@ export async function onRequestPost({ request, env }) {
 
     const results = await Promise.all(items.map(async (item) => {
       if (!item || typeof item.id !== "string" || !/^[A-Z]{3}[0-9]+$/.test(item.id)) return null;
-      const price = amount(item.price);
-      const listingType = safeText(item.listing_type_id);
-      const category = safeText(item.category_id);
-      const mode = safeText(item.shipping?.mode);
-      const logisticType = safeText(item.shipping?.logistic_type);
-      const sellerSku = skuMap.get(item.id) || safeText(item.seller_sku);
+      let price = amount(item.price);
+      let itemDetails = null;
+      let listingType = safeText(item.listing_type_id);
+      let category = safeText(item.category_id);
+      if (price === null || !listingType || !category) {
+        try {
+          const detailResponse = await requestApi(API_BASE + "/items/" + encodeURIComponent(item.id));
+          if (detailResponse.ok) itemDetails = await detailResponse.json();
+        } catch {}
+        listingType = listingType || safeText(itemDetails?.listing_type_id);
+        category = category || safeText(itemDetails?.category_id);
+      }
+      if (price === null) {
+        try {
+          const salePriceUrl = new URL(API_BASE + "/items/" + encodeURIComponent(item.id) + "/sale_price");
+          salePriceUrl.searchParams.set("context", "channel_marketplace");
+          const saleResponse = await requestApi(salePriceUrl.toString());
+          if (saleResponse.ok) price = amount((await saleResponse.json()).amount);
+        } catch {}
+      }
+      const currencyId = safeText(item.currency_id) || safeText(itemDetails?.currency_id) || "BRL";
+      const mode = safeText(item.shipping?.mode) || safeText(itemDetails?.shipping?.mode);
+      const logisticType = safeText(item.shipping?.logistic_type) || safeText(itemDetails?.shipping?.logistic_type);
+      const sellerSku = skuMap.get(item.id) || safeText(item.seller_sku) || safeText(itemDetails?.seller_custom_field) || safeText(itemDetails?.attributes?.find((attribute) => attribute.id === "SELLER_SKU")?.value_name);
       const cost = sellerSku ? costMap.get(sellerSku) : null;
       if (price === null || !listingType || !category) {
-        return { id: item.id, sku: sellerSku || null, contribution_margin: null, estimated_margin: null, missing: ["Preço/categoria/modalidade indisponível na API."] };
+        const unavailable = [];
+        if (price === null) unavailable.push("preço de venda");
+        if (!category) unavailable.push("categoria");
+        if (!listingType) unavailable.push("modalidade");
+        return { id: item.id, sku: sellerSku || null, contribution_margin: null, estimated_margin: null, missing: ["Dados não retornados pela API: " + unavailable.join(", ") + "."] };
       }
 
       const feesUrl = new URL(API_BASE + "/sites/MLB/listing_prices");
       feesUrl.searchParams.set("price", String(price));
       feesUrl.searchParams.set("category_id", category);
-      feesUrl.searchParams.set("currency_id", safeText(item.currency_id) || "BRL");
+      feesUrl.searchParams.set("currency_id", currencyId);
       feesUrl.searchParams.set("listing_type_id", listingType);
       feesUrl.searchParams.set("channel", "marketplace");
       if (mode) feesUrl.searchParams.set("shipping_mode", mode);
