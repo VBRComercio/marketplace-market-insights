@@ -346,6 +346,7 @@ async function loadPerformance() {
     performanceSummary.hidden = false;
 
     let processedOrders = Number(data.orders?.scanned || 0);
+    let ordersTotal = data.orders?.total ?? null;
     let nextOrderOffset = data.sales_error ? null : data.orders?.next_offset;
     let ordersWarning = data.sales_error || "";
     while (nextOrderOffset !== null && nextOrderOffset !== undefined && !ordersWarning) {
@@ -380,6 +381,7 @@ async function loadPerformance() {
         });
       }
       const scannedNow = Number(continuation.orders?.scanned || 0);
+      if (continuation.orders?.total !== null && continuation.orders?.total !== undefined) ordersTotal = Number(continuation.orders.total);
       processedOrders += scannedNow;
       const followingOffset = continuation.orders?.next_offset;
       if (!scannedNow && followingOffset !== null && followingOffset !== undefined) {
@@ -390,7 +392,7 @@ async function loadPerformance() {
     }
 
     if (!data.sales_error) {
-      data.orders = { ...(data.orders || {}), scanned: processedOrders, partial: nextOrderOffset !== null && nextOrderOffset !== undefined, next_offset: nextOrderOffset };
+      data.orders = { ...(data.orders || {}), scanned: processedOrders, total: ordersTotal, partial: nextOrderOffset !== null && nextOrderOffset !== undefined, next_offset: nextOrderOffset };
       data.totals.units_sold = [...performanceByItem.values()].reduce((sum, item) => sum + (Number(item.units_sold) || 0), 0);
       data.totals.gross_sales = Math.round([...performanceByItem.values()].reduce((sum, item) => sum + (Number(item.gross_sales) || 0), 0) * 100) / 100;
     }
