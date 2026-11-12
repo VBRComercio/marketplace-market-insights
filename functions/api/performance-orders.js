@@ -19,7 +19,7 @@ async function handleRequest(request, env) {
   const dateFrom = parseDate(url.searchParams.get("date_from"));
   const dateTo = parseDate(url.searchParams.get("date_to"));
   if (!Number.isInteger(days) || days < 1 || days > 90) return json({ error: "O período deve ter entre 1 e 90 dias." }, 400);
-  if (!Number.isInteger(offset) || offset < 50 || offset % PAGE_SIZE !== 0 || offset > 10000) {
+  if (!Number.isInteger(offset) || offset < 0 || offset % PAGE_SIZE !== 0 || offset > 10000) {
     return json({ error: "Deslocamento de pedidos inválido." }, 400);
   }
   if (!dateFrom || !dateTo || dateTo <= dateFrom || dateTo - dateFrom > 92 * 86_400_000) {
