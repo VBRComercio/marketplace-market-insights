@@ -68,7 +68,7 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return json({ error: "Cadastro inválido." }, 400);
   const effectiveFrom = validDate(body.effective_from);
-  if (!effectiveFrom) return json({ error: "Informe uma data de vigência válida." }, 400);
+  if (body.type !== "sku_mapping" && !effectiveFrom) return json({ error: "Informe uma data de vigência válida." }, 400);
 
   if (body.type === "rates") {
     const rates = {
