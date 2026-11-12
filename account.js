@@ -99,9 +99,11 @@ async function loadAccountItems(offset = 0) {
     let priceBatchError = "";
     for (let priceOffset = 10; priceOffset < priceIds.length; priceOffset += 10) {
       setAccountStatus("Consultando preços atuais… lote " + (Math.floor(priceOffset / 10) + 1) + " de " + Math.ceil(priceIds.length / 10) + ".");
-      const batchResponse = await fetch("/api/my-items?offset=" + encodeURIComponent(offset) + "&price_offset=" + encodeURIComponent(priceOffset), {
-        headers: { Accept: "application/json" },
-        cache: "no-store"
+      const batchResponse = await fetch("/api/item-prices", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ item_ids: priceIds.slice(priceOffset, priceOffset + 10) })
       });
       const batchType = batchResponse.headers.get("content-type") || "";
       if (!batchType.toLowerCase().includes("application/json")) {
@@ -114,8 +116,8 @@ async function loadAccountItems(offset = 0) {
         break;
       }
       const batchIds = new Set(priceIds.slice(priceOffset, priceOffset + 10));
-      const batchItems = new Map((batchData.items || []).filter((item) => batchIds.has(item.id)).map((item) => [item.id, item]));
-      data.items = data.items.map((item) => batchItems.get(item.id) || item);
+      const batchItems = new Map((batchData.results || []).filter((item) => batchIds.has(item.id)).map((item) => [item.id, item]));
+      data.items = data.items.map((item) => batchItems.has(item.id) ? { ...item, ...batchItems.get(item.id) } : item);
       unavailablePrices += Number(batchData.pricing_unavailable_count || 0);
       for (const [reason, count] of Object.entries(batchData.pricing_unavailable_statuses || {})) {
         unavailablePriceStatuses[reason] = (unavailablePriceStatuses[reason] || 0) + count;
@@ -315,12 +317,15 @@ async function loadPerformance() {
     const visitIds = accountItems.map((item) => item.id);
     for (let visitsOffset = 0; visitsOffset < visitIds.length; visitsOffset += 20) {
       performanceStatus.textContent = "Consultando visitas: " + Math.min(visitsOffset + 20, visitIds.length) + " de " + visitIds.length + " anúncios…";
-      const visitParams = new URLSearchParams(params);
-      visitParams.set("visits_only", "1");
-      visitParams.set("visits_offset", String(visitsOffset));
-      const visitResponse = await fetch("/api/performance?" + visitParams.toString(), {
-        headers: { Accept: "application/json" },
-        cache: "no-store"
+      const visitResponse = await fetch("/api/item-visits", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          item_ids: visitIds.slice(visitsOffset, visitsOffset + 20),
+          days: String(days),
+          ...(period.custom ? { date_from: period.date_from, date_to: period.date_to } : {})
+        })
       });
       const visitType = visitResponse.headers.get("content-type") || "";
       if (!visitType.toLowerCase().includes("application/json")) {
@@ -332,7 +337,7 @@ async function loadPerformance() {
         visitsBatchError = visitData?.error || "Não foi possível completar a consulta das visitas.";
         break;
       }
-      for (const item of visitData.items || []) {
+      for (const item of visitData.results || []) {
         const current = performanceByItem.get(item.id);
         if (current) performanceByItem.set(item.id, { ...current, visits: item.visits ?? null });
       }
