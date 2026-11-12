@@ -313,7 +313,7 @@ async function loadPerformance() {
     performanceByItem = new Map((Array.isArray(data.items) ? data.items : []).map((item) => [item.id, item]));
     let visitsBatchError = "";
     const visitIds = accountItems.map((item) => item.id);
-    for (let visitsOffset = 30; visitsOffset < visitIds.length; visitsOffset += 20) {
+    for (let visitsOffset = 0; visitsOffset < visitIds.length; visitsOffset += 20) {
       performanceStatus.textContent = "Consultando visitas: " + Math.min(visitsOffset + 20, visitIds.length) + " de " + visitIds.length + " anúncios…";
       const visitParams = new URLSearchParams(params);
       visitParams.set("visits_only", "1");
