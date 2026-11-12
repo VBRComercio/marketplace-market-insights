@@ -18,7 +18,7 @@ async function handleRequest(request, env) {
   const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
   const dateFrom = parseDate(url.searchParams.get("date_from"));
   const dateTo = parseDate(url.searchParams.get("date_to"));
-  if (![7, 30, 90].includes(days)) return json({ error: "Escolha um período de 7, 30 ou 90 dias." }, 400);
+  if (!Number.isInteger(days) || days < 1 || days > 90) return json({ error: "O período deve ter entre 1 e 90 dias." }, 400);
   if (!Number.isInteger(offset) || offset < 50 || offset % PAGE_SIZE !== 0 || offset > 10000) {
     return json({ error: "Deslocamento de pedidos inválido." }, 400);
   }
