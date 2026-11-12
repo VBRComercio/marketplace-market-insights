@@ -17,12 +17,22 @@ export async function onRequestGet({ request, env }) {
 async function handleRequest(request, env) {
   const url = new URL(request.url);
   const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
-  const days = Number.parseInt(url.searchParams.get("days") || "7", 10);
+  let days = Number.parseInt(url.searchParams.get("days") || "7", 10);
+  const requestedFrom = url.searchParams.get("date_from");
+  const requestedTo = url.searchParams.get("date_to");
+  const customPeriod = Boolean(requestedFrom || requestedTo);
   if (!Number.isInteger(offset) || offset < 0 || offset > 950 || offset % PAGE_SIZE !== 0) {
     return json({ error: "Página inválida. Use um deslocamento em incrementos de 50." }, 400);
   }
-  if (![7, 30, 90].includes(days)) {
-    return json({ error: "Escolha um período de 7, 30 ou 90 dias." }, 400);
+  if (customPeriod) {
+    const fromDay = parseDateOnly(requestedFrom);
+    const toDay = parseDateOnly(requestedTo);
+    if (!fromDay || !toDay || toDay < fromDay) return json({ error: "Informe um intervalo de datas válido." }, 400);
+    days = Math.floor((toDay - fromDay) / 86_400_000) + 1;
+    if (days > 90) return json({ error: "O período personalizado pode ter no máximo 90 dias." }, 400);
+    if (requestedTo > new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })) return json({ error: "A data final não pode ser futura." }, 400);
+  } else if (![7, 30, 90].includes(days)) {
+    return json({ error: "Escolha um período de 7, 30, 90 dias ou informe datas personalizadas." }, 400);
   }
 
   let session = await readSession(request, env);
@@ -73,14 +83,22 @@ async function handleRequest(request, env) {
   let dateTo = ending + "T00:00:00.000Z";
   let dateFrom = new Date(Date.parse(dateTo) - days * 86_400_000).toISOString();
 
+  if (customPeriod) { dateFrom = brazilDayStart(requestedFrom).toISOString(); dateTo = brazilDayEnd(requestedTo).toISOString(); }
+
   const visits = {};
   const visitDateRanges = [];
   const visitFailures = [];
   const loadVisit = async (itemId) => {
-    const visitUrl = new URL(API_BASE + "/items/" + encodeURIComponent(itemId) + "/visits/time_window");
-    visitUrl.searchParams.set("last", String(days));
-    visitUrl.searchParams.set("unit", "day");
-    visitUrl.searchParams.set("ending", ending);
+    const visitUrl = customPeriod ? new URL(API_BASE + "/items/visits") : new URL(API_BASE + "/items/" + encodeURIComponent(itemId) + "/visits/time_window");
+    if (customPeriod) {
+      visitUrl.searchParams.set("ids", itemId);
+      visitUrl.searchParams.set("date_from", requestedFrom);
+      visitUrl.searchParams.set("date_to", requestedTo);
+    } else {
+      visitUrl.searchParams.set("last", String(days));
+      visitUrl.searchParams.set("unit", "day");
+      visitUrl.searchParams.set("ending", ending);
+    }
     try {
       const response = await requestApi(visitUrl.pathname + visitUrl.search);
       if (!response.ok) {
@@ -89,8 +107,9 @@ async function handleRequest(request, env) {
         return;
       }
       const payload = await response.json();
-      visits[itemId] = finiteAmount(payload.total_visits);
-      if (payload.date_from && payload.date_to) visitDateRanges.push({ from: payload.date_from, to: payload.date_to });
+      const record = Array.isArray(payload) ? payload.find((entry) => entry?.item_id === itemId) || payload[0] : (payload && typeof payload[itemId] === "object" ? payload[itemId] : payload);
+      visits[itemId] = finiteAmount(record?.total_visits ?? record?.visits ?? (typeof record === "number" ? record : null));
+      if (record?.date_from && record?.date_to) visitDateRanges.push({ from: record.date_from, to: record.date_to });
     } catch {
       visits[itemId] = null;
       visitFailures.push(0);
@@ -100,7 +119,7 @@ async function handleRequest(request, env) {
     await Promise.all(visitIds.slice(i, i + 10).map(loadVisit));
   }
 
-  if (visitDateRanges.length) {
+  if (visitDateRanges.length && !customPeriod) {
     dateFrom = visitDateRanges[0].from;
     dateTo = visitDateRanges[0].to;
   }
@@ -177,6 +196,15 @@ async function handleRequest(request, env) {
   }, 200, headers);
 }
 
+function parseDateOnly(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = Date.parse(value + "T00:00:00.000Z");
+  if (!Number.isFinite(parsed) || new Date(parsed).toISOString().slice(0, 10) !== value) return null;
+  return parsed;
+}
+
+function brazilDayStart(value) { return new Date(Date.parse(value + "T03:00:00.000Z")); }
+function brazilDayEnd(value) { return new Date(Date.parse(value + "T03:00:00.000Z") + 86_400_000 - 1); }
 function formatOrdersDate(value) {
   const parsed = new Date(value);
   if (!Number.isFinite(parsed.getTime())) throw new Error("Data inválida para consulta de pedidos.");
