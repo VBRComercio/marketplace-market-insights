@@ -2,7 +2,6 @@ import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.
 
 const API_BASE = "https://api.mercadolibre.com";
 const PAGE_SIZE = 50;
-const MAX_VISIT_LOOKUPS = 30;
 const VISIT_BATCH_SIZE = 20;
 const API_REQUEST_BUDGET = 45;
 const MAX_ORDER_PAGES = 8;
@@ -99,7 +98,7 @@ async function handleRequest(request, env) {
   const itemIds = Array.isArray(itemSearch.results) ? itemSearch.results : [];
   const visitIds = visitsOnly
     ? itemIds.slice(requestedVisitOffset, requestedVisitOffset + VISIT_BATCH_SIZE)
-    : itemIds.slice(0, MAX_VISIT_LOOKUPS);
+    : [];
   const ending = new Date().toISOString().slice(0, 10);
   let dateTo = ending + "T00:00:00.000Z";
   let dateFrom = new Date(Date.parse(dateTo) - days * 86_400_000).toISOString();
