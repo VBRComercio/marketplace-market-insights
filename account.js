@@ -79,7 +79,7 @@ async function loadAccountItems(offset = 0) {
   nextButton.disabled = true;
   setAccountStatus("Buscando anúncios ativos na sua conta…");
   try {
-    const response = await fetch("/api/my-items?offset=" + encodeURIComponent(offset), {
+    const response = await fetch("/api/my-items?offset=" + encodeURIComponent(offset) + "&price_offset=0", {
       headers: { Accept: "application/json" },
       cache: "no-store"
     });
@@ -93,6 +93,36 @@ async function loadAccountItems(offset = 0) {
       showAccountError(data, response);
       return;
     }
+    let unavailablePrices = Number(data.pricing_unavailable_count || 0);
+    const unavailablePriceStatuses = { ...(data.pricing_unavailable_statuses || {}) };
+    const priceIds = (data.items || []).map((item) => item.id);
+    let priceBatchError = "";
+    for (let priceOffset = 10; priceOffset < priceIds.length; priceOffset += 10) {
+      setAccountStatus("Consultando preços atuais… lote " + (Math.floor(priceOffset / 10) + 1) + " de " + Math.ceil(priceIds.length / 10) + ".");
+      const batchResponse = await fetch("/api/my-items?offset=" + encodeURIComponent(offset) + "&price_offset=" + encodeURIComponent(priceOffset), {
+        headers: { Accept: "application/json" },
+        cache: "no-store"
+      });
+      const batchType = batchResponse.headers.get("content-type") || "";
+      if (!batchType.toLowerCase().includes("application/json")) {
+        priceBatchError = "O servidor retornou uma resposta inesperada ao consultar preços (HTTP " + batchResponse.status + ").";
+        break;
+      }
+      const batchData = await batchResponse.json();
+      if (!batchResponse.ok) {
+        priceBatchError = batchData?.error || "Não foi possível completar a consulta dos preços.";
+        break;
+      }
+      const batchIds = new Set(priceIds.slice(priceOffset, priceOffset + 10));
+      const batchItems = new Map((batchData.items || []).filter((item) => batchIds.has(item.id)).map((item) => [item.id, item]));
+      data.items = data.items.map((item) => batchItems.get(item.id) || item);
+      unavailablePrices += Number(batchData.pricing_unavailable_count || 0);
+      for (const [reason, count] of Object.entries(batchData.pricing_unavailable_statuses || {})) {
+        unavailablePriceStatuses[reason] = (unavailablePriceStatuses[reason] || 0) + count;
+      }
+    }
+    data.pricing_unavailable_count = unavailablePrices;
+    data.pricing_unavailable_statuses = unavailablePriceStatuses;
     performanceByItem = new Map();
     performanceSummary.hidden = true;
     performanceStatus.textContent = "Escolha um período e clique em Consultar desempenho.";
@@ -105,7 +135,7 @@ async function loadAccountItems(offset = 0) {
     const priceWarning = missingPrices
       ? missingPrices + " preço(s) vigente(s) não retornado(s) pela API" + (pricingDetails ? " (" + pricingDetails + ")." : ".")
       : "Preços de venda atuais consultados no canal Mercado Livre.";
-    setAccountStatus(seller + priceWarning, missingPrices ? "warning" : "success");
+    setAccountStatus(seller + priceWarning + (priceBatchError ? " " + priceBatchError : ""), missingPrices || priceBatchError ? "warning" : "success");
   } catch {
     setAccountStatus("Falha de conexão ao carregar seus anúncios. Tente novamente.", "error");
   } finally {
@@ -281,6 +311,38 @@ async function loadPerformance() {
       return;
     }
     performanceByItem = new Map((Array.isArray(data.items) ? data.items : []).map((item) => [item.id, item]));
+    let visitsBatchError = "";
+    const visitIds = accountItems.map((item) => item.id);
+    for (let visitsOffset = 30; visitsOffset < visitIds.length; visitsOffset += 20) {
+      performanceStatus.textContent = "Consultando visitas: " + Math.min(visitsOffset + 20, visitIds.length) + " de " + visitIds.length + " anúncios…";
+      const visitParams = new URLSearchParams(params);
+      visitParams.set("visits_only", "1");
+      visitParams.set("visits_offset", String(visitsOffset));
+      const visitResponse = await fetch("/api/performance?" + visitParams.toString(), {
+        headers: { Accept: "application/json" },
+        cache: "no-store"
+      });
+      const visitType = visitResponse.headers.get("content-type") || "";
+      if (!visitType.toLowerCase().includes("application/json")) {
+        visitsBatchError = "O servidor retornou uma resposta inesperada ao completar as visitas (HTTP " + visitResponse.status + ").";
+        break;
+      }
+      const visitData = await visitResponse.json();
+      if (!visitResponse.ok) {
+        visitsBatchError = visitData?.error || "Não foi possível completar a consulta das visitas.";
+        break;
+      }
+      for (const item of visitData.items || []) {
+        const current = performanceByItem.get(item.id);
+        if (current) performanceByItem.set(item.id, { ...current, visits: item.visits ?? null });
+      }
+      if (visitData.visits_error) visitsBatchError = visitData.visits_error;
+    }
+    const currentItems = [...performanceByItem.values()];
+    data.totals.visits = currentItems.reduce((sum, item) => sum + (Number(item.visits) || 0), 0);
+    const missingVisits = currentItems.filter((item) => item.visits === null || item.visits === undefined).length;
+    data.visits_partial = missingVisits > 0;
+    if (visitsBatchError) data.visits_error = visitsBatchError;
     performanceSummary.hidden = false;
 
     let processedOrders = Number(data.orders?.scanned || 0);
@@ -519,13 +581,13 @@ async function loadMarginAnalysis() {
   setAnalysisStatus("Consultando tarifas e frete estimado na API do Mercado Livre…");
   try {
     const results = [];
-    for (let start = 0; start < accountItems.length; start += 20) {
+    for (let start = 0; start < accountItems.length; start += 10) {
       setAnalysisStatus("Calculando " + Math.min(start + 20, accountItems.length).toLocaleString("pt-BR") + " de " + accountItems.length.toLocaleString("pt-BR") + " anúncios…");
       const response = await fetch("/api/margin-estimates", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ items: accountItems.slice(start, start + 20) })
+        body: JSON.stringify({ items: accountItems.slice(start, start + 10) })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Não foi possível calcular as margens.");
