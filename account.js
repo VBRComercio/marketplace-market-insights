@@ -18,6 +18,9 @@ let accountItems = [];
 const accountSort = document.querySelector("#account-sort");
 const performanceButton = document.querySelector("#load-performance");
 const performanceDays = document.querySelector("#performance-days");
+const performanceDateRange = document.querySelector("#performance-date-range");
+const performanceDateFrom = document.querySelector("#performance-date-from");
+const performanceDateTo = document.querySelector("#performance-date-to");
 const performanceStatus = document.querySelector("#performance-status");
 const performanceSummary = document.querySelector("#performance-summary");
 const performanceRows = document.querySelector("#performance-rows");
@@ -195,6 +198,40 @@ accountSort?.addEventListener("change", () => {
   }
 });
 
+function selectedPerformancePeriod() {
+  if (performanceDays?.value !== "custom") return { days: Number(performanceDays?.value) || 30, custom: false };
+  const from = performanceDateFrom?.value || "";
+  const to = performanceDateTo?.value || "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new Error("Informe as datas inicial e final do período.");
+  const fromTime = Date.parse(from + "T00:00:00Z");
+  const toTime = Date.parse(to + "T00:00:00Z");
+  if (!Number.isFinite(fromTime) || !Number.isFinite(toTime) || toTime < fromTime) throw new Error("A data final deve ser igual ou posterior à data inicial.");
+  const days = Math.floor((toTime - fromTime) / 86400000) + 1;
+  if (days > 90) throw new Error("O período personalizado pode ter no máximo 90 dias.");
+  if (to > todayInBrazil()) throw new Error("A data final não pode ser futura.");
+  return { days, custom: true, date_from: from, date_to: to };
+}
+
+function performancePeriodDays() {
+  try { return selectedPerformancePeriod().days; } catch { return 30; }
+}
+
+function initializeCustomPerformanceDates() {
+  const today = todayInBrazil();
+  const end = Date.parse(today + "T00:00:00Z");
+  const start = new Date(end - 29 * 86400000).toISOString().slice(0, 10);
+  performanceDateFrom.value ||= start;
+  performanceDateTo.value ||= today;
+  performanceDateFrom.max = today;
+  performanceDateTo.max = today;
+  if (performanceDateFrom.value > performanceDateTo.value) performanceDateFrom.value = performanceDateTo.value;
+}
+
+performanceDays?.addEventListener("change", () => {
+  const custom = performanceDays.value === "custom";
+  performanceDateRange.hidden = !custom;
+  if (custom) initializeCustomPerformanceDates();
+});
 async function loadPerformance() {
   if (loadingPerformance) return;
   if (!accountPaging) {
@@ -207,8 +244,16 @@ async function loadPerformance() {
   performanceStatus.textContent = "Consultando visitas e pedidos pagos no Mercado Livre…";
   performanceStatus.className = "account-status";
   try {
-    const days = Number(performanceDays.value);
-    const response = await fetch("/api/performance?offset=" + encodeURIComponent(currentOffset) + "&days=" + encodeURIComponent(days), {
+    let period;
+    try { period = selectedPerformancePeriod(); } catch (error) {
+      performanceStatus.textContent = error.message;
+      performanceStatus.className = "account-status warning";
+      return;
+    }
+    const days = period.days;
+    const params = new URLSearchParams({ offset: String(currentOffset), days: String(days) });
+    if (period.custom) { params.set("date_from", period.date_from); params.set("date_to", period.date_to); }
+    const response = await fetch("/api/performance?" + params.toString(), {
       headers: { Accept: "application/json" },
       cache: "no-store"
     });
@@ -300,7 +345,7 @@ async function loadPerformance() {
     const dateLabel = data.date_from && data.date_to
       ? " (" + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date(data.date_from)) + " a " + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date(data.date_to)) + ")"
       : "";
-    performanceStatus.textContent = seller + "Período de " + days + " dias consultado" + dateLabel + "." + (warnings.length ? " " + warnings.join(" ") : "");
+    performanceStatus.textContent = seller + (period.custom ? "Período personalizado consultado" : "Período de " + days + " dias consultado") + dateLabel + "." + (warnings.length ? " " + warnings.join(" ") : "");
     performanceStatus.className = "account-status" + (warnings.length ? " warning" : " success");
     renderMarginTable();
   } catch {
@@ -504,7 +549,7 @@ function renderMarginTable() {
     const metrics = performanceByItem.get(item.id);
     const quantity = item.available_quantity === null || item.available_quantity === undefined ? null : Number(item.available_quantity);
     const units = metrics?.units_sold === null || metrics?.units_sold === undefined ? null : Number(metrics.units_sold);
-    const periodDays = Number(performanceDays?.value) || 30;
+    const periodDays = performancePeriodDays();
     const dailySales = units === null ? null : units / periodDays;
     const coverage = dailySales === null ? "Consulte desempenho" : dailySales > 0 ? quantity === null ? "N/D" : (quantity / dailySales).toFixed(1).replace(".", ",") + " dias" : "Sem vendas";
     const coverageValue = dailySales > 0 && quantity !== null ? quantity / dailySales : null;
@@ -546,7 +591,7 @@ function renderMarginTable() {
     const metrics = performanceByItem.get(item.id);
     const qty = item.available_quantity === null || item.available_quantity === undefined ? null : Number(item.available_quantity);
     const soldUnits = metrics?.units_sold;
-    const daily = soldUnits === null || soldUnits === undefined ? null : Number(soldUnits) / (Number(performanceDays?.value) || 30);
+    const daily = soldUnits === null || soldUnits === undefined ? null : Number(soldUnits) / performancePeriodDays();
     return daily > 0 && qty !== null && Number.isFinite(qty) && qty / daily <= Number(analysisConfig?.rates?.stock_alert_days ?? 7);
   }).length;
   const lowStockElement = document.querySelector("#analysis-low-stock-count");
