@@ -2,7 +2,7 @@ import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.
 
 const API_BASE = "https://api.mercadolibre.com";
 const PAGE_SIZE = 50;
-const MAX_VISIT_LOOKUPS = 45;
+const MAX_VISIT_LOOKUPS = PAGE_SIZE;
 const MAX_ORDER_PAGES = 8;
 const ORDER_PAGE_SIZE = 50;
 
