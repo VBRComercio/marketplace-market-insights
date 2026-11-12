@@ -10,7 +10,7 @@ export async function onRequestPost({ request, env }) {
     if (!request.headers.get("content-type")?.toLowerCase().includes("application/json")) return json({ error: "Envie os anúncios em formato JSON." }, 415);
     const body = await request.json().catch(() => null);
     const items = Array.isArray(body?.items) ? body.items.slice(0, MAX_ITEMS) : [];
-    if (!items.length) return json({ error: "Envie até 20 anúncios para calcular a margem." }, 400);
+    if (!items.length) return json({ error: "Envie até 10 anúncios para calcular a margem." }, 400);
 
     const auth = await getSeller(request, env);
     if (auth.response) return auth.response;
