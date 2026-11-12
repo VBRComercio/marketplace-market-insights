@@ -123,6 +123,11 @@ async function loadAccountItems(offset = 0) {
         unavailablePriceStatuses[reason] = (unavailablePriceStatuses[reason] || 0) + count;
       }
     }
+    const missingPriceCount = data.items.filter((item) => item.price === null || item.price === undefined || item.price === "").length;
+    if (missingPriceCount > unavailablePrices) {
+      unavailablePriceStatuses["preço ausente após consulta"] = (unavailablePriceStatuses["preço ausente após consulta"] || 0) + missingPriceCount - unavailablePrices;
+      unavailablePrices = missingPriceCount;
+    }
     data.pricing_unavailable_count = unavailablePrices;
     data.pricing_unavailable_statuses = unavailablePriceStatuses;
     performanceByItem = new Map();
@@ -344,8 +349,10 @@ async function loadPerformance() {
       if (visitData.visits_error) visitsBatchError = visitData.visits_error;
     }
     const currentItems = [...performanceByItem.values()];
-    data.totals.visits = currentItems.reduce((sum, item) => sum + (Number(item.visits) || 0), 0);
     const missingVisits = currentItems.filter((item) => item.visits === null || item.visits === undefined).length;
+    data.totals.visits = currentItems.length > 0 && missingVisits === currentItems.length
+      ? null
+      : currentItems.reduce((sum, item) => sum + (Number(item.visits) || 0), 0);
     data.visits_partial = missingVisits > 0;
     if (visitsBatchError) data.visits_error = visitsBatchError;
     performanceSummary.hidden = false;
