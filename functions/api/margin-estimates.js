@@ -1,7 +1,7 @@
 import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.js";
 
 const API_BASE = "https://api.mercadolibre.com";
-const MAX_ITEMS = 20;
+const MAX_ITEMS = 10;
 const FALLBACK_RATES = { nf_percent: 4, ads_percent: 2.5, defect_percent: 2, operational_percent: 5 };
 
 export async function onRequestPost({ request, env }) {
