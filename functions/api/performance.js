@@ -2,7 +2,9 @@ import { readSession, sessionCookie, clearSessionCookie } from "../_lib/session.
 
 const API_BASE = "https://api.mercadolibre.com";
 const PAGE_SIZE = 50;
-const MAX_VISIT_LOOKUPS = PAGE_SIZE;
+const MAX_VISIT_LOOKUPS = 30;
+const VISIT_BATCH_SIZE = 20;
+const API_REQUEST_BUDGET = 45;
 const MAX_ORDER_PAGES = 8;
 const ORDER_PAGE_SIZE = 50;
 
@@ -19,6 +21,9 @@ async function handleRequest(request, env) {
   const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
   let days = Number.parseInt(url.searchParams.get("days") || "7", 10);
   const requestedFrom = url.searchParams.get("date_from");
+  const visitsOnly = url.searchParams.get("visits_only") === "1";
+  const requestedVisitOffset = Number.parseInt(url.searchParams.get("visits_offset") || "0", 10);
+  if (!Number.isInteger(requestedVisitOffset) || requestedVisitOffset < 0 || requestedVisitOffset >= PAGE_SIZE) return json({ error: "Faixa de visitas inválida." }, 400);
   const requestedTo = url.searchParams.get("date_to");
   const customPeriod = Boolean(requestedFrom || requestedTo);
   if (!Number.isInteger(offset) || offset < 0 || offset > 950 || offset % PAGE_SIZE !== 0) {
@@ -40,6 +45,7 @@ async function handleRequest(request, env) {
 
   let refreshed = false;
   let refreshPromise = null;
+  let apiRequestsUsed = 0;
   if (session.expires_at <= Date.now() + 60_000) {
     session = await refreshSession(session, env);
     if (!session) return json({ error: "A autorização expirou. Conecte sua conta novamente.", login_url: "/auth/login" }, 401, { "Set-Cookie": clearSessionCookie() });
@@ -50,6 +56,8 @@ async function handleRequest(request, env) {
     const apiUrl = target.startsWith("http") ? target : API_BASE + target;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
+        if (apiRequestsUsed >= API_REQUEST_BUDGET) throw new Error("Limite interno de chamadas desta consulta atingido.");
+        apiRequestsUsed += 1;
         const tokenUsed = session.access_token;
         let response = await fetch(apiUrl, { headers: { Accept: "application/json", Authorization: "Bearer " + tokenUsed } });
         if (response.status === 401) {
@@ -61,6 +69,8 @@ async function handleRequest(request, env) {
             refreshPromise = null;
           }
           if (session.access_token !== tokenUsed) {
+            if (apiRequestsUsed >= API_REQUEST_BUDGET) throw new Error("Limite interno de chamadas desta consulta atingido.");
+            apiRequestsUsed += 1;
             response = await fetch(apiUrl, { headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token } });
           }
         }
@@ -87,7 +97,9 @@ async function handleRequest(request, env) {
   if (!itemsResponse.ok) return upstreamError(itemsResponse, "Não foi possível listar os anúncios ativos.", refreshed ? await sessionCookie(session, env) : null);
   const itemSearch = await itemsResponse.json();
   const itemIds = Array.isArray(itemSearch.results) ? itemSearch.results : [];
-  const visitIds = itemIds.slice(0, MAX_VISIT_LOOKUPS);
+  const visitIds = visitsOnly
+    ? itemIds.slice(requestedVisitOffset, requestedVisitOffset + VISIT_BATCH_SIZE)
+    : itemIds.slice(0, MAX_VISIT_LOOKUPS);
   const ending = new Date().toISOString().slice(0, 10);
   let dateTo = ending + "T00:00:00.000Z";
   let dateFrom = new Date(Date.parse(dateTo) - days * 86_400_000).toISOString();
@@ -133,54 +145,17 @@ async function handleRequest(request, env) {
     dateTo = visitDateRanges[0].to;
   }
 
-  const ordersUrl = new URL(API_BASE + "/orders/search");
-  ordersUrl.searchParams.set("seller", String(me.id));
-  ordersUrl.searchParams.set("order.status", "paid");
-  ordersUrl.searchParams.set("order.date_created.from", formatOrdersDate(dateFrom));
-  ordersUrl.searchParams.set("order.date_created.to", formatOrdersDate(dateTo));
-  ordersUrl.searchParams.set("sort", "date_desc");
-  ordersUrl.searchParams.set("limit", String(ORDER_PAGE_SIZE));
-
   const salesByItem = {};
-  let ordersScanned = 0;
-  let ordersTotal = null;
-  let salesError = null;
-  let ordersPartial = false;
-  const orderPages = Math.min(MAX_ORDER_PAGES, Math.max(1, 48 - visitIds.length - 2));
+  const ordersScanned = 0;
+  const ordersTotal = null;
+  const ordersPartial = true;
+  const salesError = null;
 
-  try {
-    for (let page = 0; page < orderPages; page++) {
-      ordersUrl.searchParams.set("offset", String(page * ORDER_PAGE_SIZE));
-      const response = await requestApi(ordersUrl.pathname + ordersUrl.search);
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        const detail = safeApiMessage(payload) || "A API não autorizou a consulta de pedidos.";
-        const requestId = response.headers.get("x-request-id");
-        salesError = detail + " (HTTP " + response.status + ")" + (requestId ? " · ID: " + requestId : "");
-        break;
-      }
-      const payload = await response.json();
-      const results = Array.isArray(payload.results) ? payload.results : [];
-      ordersTotal = Number(payload.paging?.total ?? results.length);
-      ordersScanned += results.length;
-      for (const order of results) {
-        if (order.status !== "paid" || (Array.isArray(order.tags) && order.tags.includes("cancelled"))) continue;
-        for (const line of order.order_items || []) {
-          const itemId = line.item?.id;
-          if (!itemId) continue;
-          const quantity = finiteAmount(line.quantity) || 0;
-          const unitPrice = finiteAmount(line.unit_price) ?? finiteAmount(line.full_unit_price) ?? 0;
-          if (!salesByItem[itemId]) salesByItem[itemId] = { units: 0, gross: 0 };
-          salesByItem[itemId].units += quantity;
-          salesByItem[itemId].gross += quantity * unitPrice;
-        }
-      }
-      if (!results.length || (ordersTotal !== null && ordersScanned >= ordersTotal)) break;
-      if (page === orderPages - 1) ordersPartial = true;
-    }
-    if (ordersTotal !== null && ordersScanned < ordersTotal) ordersPartial = true;
-  } catch {
-    salesError = "A conexão com a API de pedidos falhou após novas tentativas.";
+  if (visitsOnly) {
+    const missing = visitIds.filter((id) => visits[id] === null).length;
+    const errorSummary = Object.entries(visitFailures.reduce((counts, status) => { const label = status ? "HTTP " + status : "conexão"; counts[label] = (counts[label] || 0) + 1; return counts; }, {})).map(([label, count]) => label + ": " + count).join(", ");
+    const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
+    return json({ items: visitIds.map((id) => ({ id, visits: visits[id] ?? null })), visits_partial: missing > 0, visits_unavailable_count: missing, visits_error: visitFailures.length ? "A consulta falhou para " + visitFailures.length + " anúncio(s) (" + errorSummary + ")." : null }, 200, headers);
   }
 
   const visitFailureSummary = Object.entries(visitFailures.reduce((counts, status) => { const label = status ? "HTTP " + status : "conexão"; counts[label] = (counts[label] || 0) + 1; return counts; }, {})).map(([label, count]) => label + ": " + count).join(", ");
@@ -200,7 +175,7 @@ async function handleRequest(request, env) {
       units_sold: salesError ? null : items.reduce((sum, item) => sum + (item.units_sold || 0), 0),
       gross_sales: salesError ? null : Math.round(items.reduce((sum, item) => sum + (item.gross_sales || 0), 0) * 100) / 100
     },
-    orders: { scanned: ordersScanned, total: ordersTotal, partial: ordersPartial, next_offset: ordersPartial ? ordersScanned : null },
+    orders: { scanned: ordersScanned, total: ordersTotal, partial: ordersPartial, next_offset: 0 },
     visits_partial: itemIds.length > visitIds.length || visitFailures.length > 0,
     visits_unavailable_count: itemIds.length - Object.values(visits).filter((value) => value !== null).length,
     sales_error: salesError,
