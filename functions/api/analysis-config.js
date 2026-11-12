@@ -68,7 +68,7 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return json({ error: "Cadastro inválido." }, 400);
   const effectiveFrom = validDate(body.effective_from);
-  if (!effectiveFrom) return json({ error: "Informe uma data de vigência válida." }, 400);
+  if (body.type !== "sku_mapping" && !effectiveFrom) return json({ error: "Informe uma data de vigência válida." }, 400);
 
   if (body.type === "rates") {
     const rates = {
@@ -86,27 +86,39 @@ async function saveConfig(request, db, sellerId, session, env, refreshed) {
     return json({ saved: true, type: "rates", effective_from: effectiveFrom, rates }, 200, headers);
   }
 
+  if (body.type === "sku_mapping") {
+    const itemId = typeof body.item_id === "string" && /^[A-Z]{3}[0-9]+$/.test(body.item_id) ? body.item_id : null;
+    const sku = typeof body.sku === "string" ? body.sku.trim().slice(0, 100) : "";
+    if (!itemId || !sku) return json({ error: "Selecione um anúncio e informe o SKU do produto." }, 400);
+    await db.prepare(
+      "INSERT INTO listing_sku_map (seller_id, item_id, sku) VALUES (?, ?, ?) ON CONFLICT(seller_id, item_id) DO UPDATE SET sku = excluded.sku, updated_at = CURRENT_TIMESTAMP"
+    ).bind(String(sellerId), itemId, sku).run();
+    const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
+    return json({ saved: true, type: "sku_mapping", item_id: itemId, sku }, 200, headers);
+  }
+
   if (body.type === "sku_cost") {
     const itemId = typeof body.item_id === "string" && /^[A-Z]{3}[0-9]+$/.test(body.item_id) ? body.item_id : null;
     const sku = typeof body.sku === "string" ? body.sku.trim().slice(0, 100) : "";
     const lotCode = typeof body.lot_code === "string" ? body.lot_code.trim().slice(0, 100) : "";
     const unitCost = validMoney(body.unit_cost);
     const packagingCost = validMoney(body.packaging_cost);
-    if (!itemId || !sku || !lotCode || unitCost === null || packagingCost === null) {
-      return json({ error: "Preencha anúncio, SKU, lote, custo do produto e embalagem com valores válidos." }, 400);
+    if (!sku || !lotCode || unitCost === null || packagingCost === null) {
+      return json({ error: "Preencha SKU, lote, custo do produto e embalagem com valores válidos." }, 400);
     }
-    await db.batch([
-      db.prepare(
+    const statements = [];
+    if (itemId) {
+      statements.push(db.prepare(
         "INSERT INTO listing_sku_map (seller_id, item_id, sku) VALUES (?, ?, ?) ON CONFLICT(seller_id, item_id) DO UPDATE SET sku = excluded.sku, updated_at = CURRENT_TIMESTAMP"
-      ).bind(String(sellerId), itemId, sku),
-      db.prepare(
-        "INSERT INTO sku_cost_history (seller_id, sku, lot_code, effective_from, unit_cost, packaging_cost) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(seller_id, sku, lot_code, effective_from) DO UPDATE SET unit_cost = excluded.unit_cost, packaging_cost = excluded.packaging_cost"
-      ).bind(String(sellerId), sku, lotCode, effectiveFrom, unitCost, packagingCost)
-    ]);
+      ).bind(String(sellerId), itemId, sku));
+    }
+    statements.push(db.prepare(
+      "INSERT INTO sku_cost_history (seller_id, sku, lot_code, effective_from, unit_cost, packaging_cost) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(seller_id, sku, lot_code, effective_from) DO UPDATE SET unit_cost = excluded.unit_cost, packaging_cost = excluded.packaging_cost"
+    ).bind(String(sellerId), sku, lotCode, effectiveFrom, unitCost, packagingCost));
+    await db.batch(statements);
     const headers = refreshed ? { "Set-Cookie": await sessionCookie(session, env) } : {};
     return json({ saved: true, type: "sku_cost", item_id: itemId, sku, lot_code: lotCode, effective_from: effectiveFrom }, 200, headers);
   }
-
   return json({ error: "Tipo de cadastro desconhecido." }, 400);
 }
 

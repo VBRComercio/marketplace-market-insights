@@ -126,7 +126,7 @@
         <div class="page-heading"><div class="eyebrow"><span class="eyebrow-line"></span> RENTABILIDADE E ESTOQUE</div><h1 id="analysis-page-heading">Margem e estoque</h1><p>Repasse previsto, margem estimada e indicadores analíticos de estoque da conta.</p></div>
           <section class="analysis-panel" aria-labelledby="analysis-heading">
             <div class="analysis-heading">
-              <div><div class="eyebrow"><span class="eyebrow-line"></span> RENTABILIDADE E ESTOQUE</div><h3 id="analysis-heading">Margem e estoque</h3><p>A margem de contribuição representa o repasse previsto. A margem estimada desconta os custos cadastrados; a cobertura usa o período selecionado.</p></div>
+              <div><div class="eyebrow"><span class="eyebrow-line"></span> RENTABILIDADE E ESTOQUE</div><h3 id="analysis-heading">Margem e estoque</h3><p>A tarifa, o preço e o estoque são calculados por anúncio; o custo do produto e a embalagem são compartilhados pelo SKU. A cobertura usa o período selecionado.</p></div>
               <button type="button" id="load-margin-analysis">Atualizar análise</button>
             </div>
             <div id="analysis-status" class="account-status" role="status" aria-live="polite">Carregue os anúncios para consultar margens e estoque.</div>
@@ -151,10 +151,18 @@
                 </form>
               </section>
               <section class="analysis-config-card">
+                <h4>Vincular anúncio ao SKU</h4>
+                <p>Associe cada publicação ao SKU do produto. Vários anúncios podem usar o mesmo SKU.</p>
+                <form id="analysis-mapping-form">
+                  <label>Anúncio<select id="mapping-item" required></select></label>
+                  <label>SKU<input id="mapping-sku" type="text" maxlength="100" required></label>
+                  <button type="submit">Salvar vínculo</button>
+                </form>
+              </section>
+              <section class="analysis-config-card">
                 <h4>Custo do produto por SKU/lote</h4>
-                <p>Informe o custo e a vigência. O custo mais recente válido será usado na análise atual.</p>
+                <p>Cadastre o custo uma vez por SKU e lote. Todos os anúncios vinculados ao SKU usarão esse custo.</p>
                 <form id="analysis-cost-form">
-                  <label>Anúncio<select id="cost-item" required></select></label>
                   <label>SKU<input id="cost-sku" type="text" maxlength="100" required></label>
                   <label>Lote<input id="cost-lot" type="text" maxlength="100" placeholder="Identificação do lote" required></label>
                   <label>Vigente a partir de<input id="cost-effective-from" type="date" required></label>

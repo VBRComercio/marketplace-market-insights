@@ -35,7 +35,10 @@ const analysisStockValue = document.querySelector("#analysis-stock-value");
 const marginRows = document.querySelector("#margin-rows");
 const ratesForm = document.querySelector("#analysis-rates-form");
 const costForm = document.querySelector("#analysis-cost-form");
-const costItemSelect = document.querySelector("#cost-item");
+const mappingForm = document.querySelector("#analysis-mapping-form");
+const mappingItemSelect = document.querySelector("#mapping-item");
+const mappingSkuInput = document.querySelector("#mapping-sku");
+const costSkuInput = document.querySelector("#cost-sku");
 let analysisConfig = null;
 let marginByItem = new Map();
 let loadingAnalysisConfig = false;
@@ -351,33 +354,43 @@ function fillAnalysisForms() {
   document.querySelector("#rate-stock-alert").value = rates.stock_alert_days ?? 7;
   document.querySelector("#cost-effective-from").value = todayInBrazil();
 
-  const previousSelection = costItemSelect.value;
+  const previousItem = mappingItemSelect.value;
+  const previousCostSku = costSkuInput.value;
   const mappings = new Map((analysisConfig.mappings || []).map((entry) => [entry.item_id, entry.sku]));
-  costItemSelect.innerHTML = '<option value="">Selecione um anúncio</option>' + accountItems.map((item) =>
+  mappingItemSelect.innerHTML = '<option value="">Selecione um anúncio</option>' + accountItems.map((item) =>
     '<option value="' + accountEsc(item.id) + '">' + accountEsc(item.title) + ' (' + accountEsc(item.id) + ')</option>'
   ).join("");
-  if (accountItems.some((item) => item.id === previousSelection)) costItemSelect.value = previousSelection;
-  else if (accountItems.length) costItemSelect.value = accountItems[0].id;
-  populateCostFields(mappings);
+  if (accountItems.some((item) => item.id === previousItem)) mappingItemSelect.value = previousItem;
+  else if (accountItems.length) mappingItemSelect.value = accountItems[0].id;
+  populateMappingSku(mappings);
+
+  const selectedSku = previousCostSku || mappingSkuInput.value;
+  if (!costSkuInput.value) costSkuInput.value = selectedSku;
+  populateCostBySku();
 }
 
-function populateCostFields(mappings = new Map()) {
-  const selected = accountItems.find((item) => item.id === costItemSelect.value);
-  if (!selected) return;
-  const sku = mappings.get(selected.id) || selected.seller_sku || "";
-  document.querySelector("#cost-sku").value = sku;
-  const latest = (analysisConfig?.latest_costs || []).find((cost) => cost.sku === sku);
+function populateMappingSku(mappings = new Map((analysisConfig?.mappings || []).map((entry) => [entry.item_id, entry.sku]))) {
+  const selected = accountItems.find((item) => item.id === mappingItemSelect.value);
+  if (!selected) {
+    mappingSkuInput.value = "";
+    return;
+  }
+  mappingSkuInput.value = mappings.get(selected.id) || selected.seller_sku || "";
+}
+
+function populateCostBySku() {
+  if (!analysisConfig) return;
+  const sku = costSkuInput.value.trim();
+  const latest = (analysisConfig.latest_costs || []).find((cost) => cost.sku === sku);
   if (latest) {
     document.querySelector("#cost-unit").value = latest.unit_cost;
     document.querySelector("#cost-packaging").value = latest.packaging_cost;
-    document.querySelector("#cost-lot").value = "";
   } else {
     document.querySelector("#cost-unit").value = "";
     document.querySelector("#cost-packaging").value = "0.50";
-    document.querySelector("#cost-lot").value = "";
   }
+  document.querySelector("#cost-lot").value = "";
 }
-
 function renderAnalysisHistory() {
   const target = document.querySelector("#analysis-history");
   if (!target || !analysisConfig) return;
@@ -427,13 +440,21 @@ ratesForm?.addEventListener("submit", (event) => {
   }, "Parâmetros gerais salvos para todo o CNPJ.");
 });
 
-costItemSelect?.addEventListener("change", () => populateCostFields(new Map((analysisConfig?.mappings || []).map((entry) => [entry.item_id, entry.sku]))));
+mappingItemSelect?.addEventListener("change", () => populateMappingSku());
+mappingForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveAnalysisForm(mappingForm, {
+    type: "sku_mapping",
+    item_id: mappingItemSelect.value,
+    sku: mappingSkuInput.value
+  }, "Anúncio vinculado ao SKU. Esse SKU pode estar associado a outros anúncios.");
+});
+costSkuInput?.addEventListener("change", populateCostBySku);
 costForm?.addEventListener("submit", (event) => {
   event.preventDefault();
   saveAnalysisForm(costForm, {
     type: "sku_cost",
-    item_id: costItemSelect.value,
-    sku: document.querySelector("#cost-sku").value,
+    sku: costSkuInput.value,
     lot_code: document.querySelector("#cost-lot").value,
     effective_from: document.querySelector("#cost-effective-from").value,
     unit_cost: document.querySelector("#cost-unit").value,
