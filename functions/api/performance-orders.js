@@ -38,25 +38,34 @@ async function handleRequest(request, env) {
   }
 
   const requestApi = async (target) => {
-    const tokenUsed = session.access_token;
-    let response = await fetch(API_BASE + target, {
-      headers: { Accept: "application/json", Authorization: "Bearer " + tokenUsed }
-    });
-    if (response.status === 401) {
-      if (!refreshPromise && !refreshed) refreshPromise = refreshSession(session, env);
-      const nextSession = refreshPromise ? await refreshPromise : null;
-      if (nextSession) {
-        session = nextSession;
-        refreshed = true;
-        refreshPromise = null;
-      }
-      if (session.access_token !== tokenUsed) {
-        response = await fetch(API_BASE + target, {
-          headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token }
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const tokenUsed = session.access_token;
+        let response = await fetch(API_BASE + target, {
+          headers: { Accept: "application/json", Authorization: "Bearer " + tokenUsed }
         });
+        if (response.status === 401) {
+          if (!refreshPromise && !refreshed) refreshPromise = refreshSession(session, env);
+          const nextSession = refreshPromise ? await refreshPromise : null;
+          if (nextSession) {
+            session = nextSession;
+            refreshed = true;
+            refreshPromise = null;
+          }
+          if (session.access_token !== tokenUsed) {
+            response = await fetch(API_BASE + target, {
+              headers: { Accept: "application/json", Authorization: "Bearer " + session.access_token }
+            });
+          }
+        }
+        if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) return response;
+        await waitBeforeRetry(response, attempt);
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await waitBeforeRetry(null, attempt);
       }
     }
-    return response;
+    throw new Error("A API não respondeu após novas tentativas.");
   };
 
   const meResponse = await requestApi("/users/me");
@@ -124,6 +133,11 @@ async function handleRequest(request, env) {
   }, 200, headers);
 }
 
+async function waitBeforeRetry(response, attempt) {
+  const retryAfter = Number(response?.headers?.get("retry-after"));
+  const delay = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(2000, retryAfter * 1000) : (attempt === 0 ? 300 : 800);
+  await new Promise((resolve) => setTimeout(resolve, delay));
+}
 function parseDate(value) {
   if (!value || value.length > 40) return null;
   const parsed = new Date(value);
